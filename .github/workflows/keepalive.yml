@@ -1,0 +1,40 @@
+# Daily ping: keeps the free Supabase project from pausing and stores the day's weather.
+# Also makes sure GitHub does not switch this schedule off: GitHub disables scheduled
+# workflows in repositories without commits for 60 days, so after 50 quiet days this job
+# pushes an empty "keepalive" commit.
+name: Daily keepalive
+
+on:
+  schedule:
+    - cron: '17 5 * * *'   # every day 05:17 UTC (07:17 in Amsterdam during summer time)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (daily job + weather)
+        run: |
+          curl -fsS --retry 3 --retry-delay 20 -X POST \
+            "https://melrcbypzdndyixevdqp.supabase.co/functions/v1/daily" \
+            -H "Content-Type: application/json" -d '{}'
+          echo
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Keep the schedule alive
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          if [ $(( (now - last) / 86400 )) -ge 50 ]; then
+            git config user.name "keepalive-bot"
+            git config user.email "keepalive-bot@users.noreply.github.com"
+            git commit --allow-empty -m "keepalive: keep scheduled workflow active"
+            git push
+          else
+            echo "Recent activity, nothing to do."
+          fi

@@ -1,0 +1,346 @@
+// Waste registration for kitchen staff. Target: done in about 10 seconds.
+// Photo -> (AI suggestion) -> what -> weight -> reason -> save. Everything else is optional.
+import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, confirmDialog } from '../core.js';
+import { t } from '../i18n.js';
+
+const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent' };
+
+let s; // page state
+
+function freshState(keep = {}) {
+  const meta = state.meta;
+  const saved = Number(localStorage.getItem(LS.restaurant));
+  const restaurantId = keep.restaurantId || (meta.restaurants.some((r) => r.id === saved) ? saved : meta.restaurants[0]?.id);
+  return {
+    restaurantId,
+    unit: localStorage.getItem(LS.unit) || 'kg',
+    photo: null, // { url, token, uploading, ai: 'thinking'|'done'|'off'|'fail', suggestion }
+    productId: null, productName: '', categoryId: null, search: '',
+    weight: '', reasonId: null,
+    menuItemId: null, supplierId: null, location: '', moment: defaultMoment(), note: '', when: '',
+    saving: false,
+  };
+}
+
+function defaultMoment() {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 16) return 'lunch';
+  if (h < 22) return 'dinner';
+  return 'closing';
+}
+
+export async function renderRegister() {
+  s = freshState();
+  app().className = 'app narrow';
+  if (!state.meta.restaurants.length) { app().innerHTML = `<div class="card empty">${t('no_data')}</div>`; return; }
+  app().innerHTML = `
+    <div class="page-head"><h1>${t('reg_title')}</h1></div>
+    <form class="reg" id="reg" novalidate>
+      <div id="sec-restaurant"></div>
+      <section class="step" id="sec-photo"></section>
+      <section class="step" id="sec-what"></section>
+      <section class="step" id="sec-weight"></section>
+      <section class="step" id="sec-reason"></section>
+      <section class="step"><details class="more" id="sec-more"><summary>${t('reg_more')}</summary><div id="more-body"></div></details></section>
+      <div class="sticky-save"><button type="submit" class="btn-primary btn-xl" id="save-btn"></button></div>
+    </form>
+    <section class="card recent" id="sec-today" style="margin-top:18px"></section>`;
+  $('#reg').onsubmit = (e) => { e.preventDefault(); save(); };
+  renderAll();
+  loadToday();
+}
+
+function renderAll() {
+  renderRestaurant(); renderPhoto(); renderWhat(); renderWeight(); renderReason(); renderMore(); updateSave();
+}
+
+// ------------------------------------------------------------------ restaurant
+function renderRestaurant() {
+  const list = state.meta.restaurants;
+  const el = $('#sec-restaurant');
+  if (list.length < 2) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="chips">${list.map((r) =>
+    `<button type="button" class="chip ${r.id === s.restaurantId ? 'on' : ''}" data-r="${r.id}">${esc(r.name)}</button>`).join('')}</div>`;
+  $$('[data-r]', el).forEach((b) => (b.onclick = () => {
+    s.restaurantId = Number(b.dataset.r);
+    localStorage.setItem(LS.restaurant, String(s.restaurantId));
+    renderRestaurant(); renderMore(); loadToday();
+  }));
+}
+
+// ------------------------------------------------------------------ photo + AI
+function renderPhoto() {
+  const el = $('#sec-photo');
+  const head = `<div class="step-title"><span class="step-num">1</span>${t('reg_photo')} <span class="muted small">(${t('reg_photo_optional')})</span></div>`;
+  if (!s.photo) {
+    el.className = 'step';
+    el.innerHTML = `${head}
+      <label class="photo-btn btn" for="photo-input">&#128247;&nbsp; ${t('reg_photo_btn')}</label>
+      <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>`;
+    $('#photo-input').onchange = (e) => e.target.files[0] && handlePhoto(e.target.files[0]);
+    return;
+  }
+  const p = s.photo;
+  let ai = '';
+  if (p.uploading || p.ai === 'thinking') ai = `<div class="ai-card"><span class="spinner"></span> ${t('reg_ai_thinking')}</div>`;
+  else if (p.ai === 'done' && p.suggestion) {
+    const sg = p.suggestion;
+    const cat = state.meta.waste_categories.find((c) => c.id === sg.waste_category_id);
+    const applied = s.productId === sg.product_id && s.categoryId === sg.waste_category_id && (sg.product_id || s.productName === sg.product_name);
+    ai = `<div class="ai-card"><div class="small muted">${t('reg_ai_suggest')}</div>
+      <strong>${esc(sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
+      ${applied ? '' : `<div style="margin-top:6px"><button type="button" class="btn-sm btn-primary" id="ai-use">${t('reg_ai_use')}</button></div>`}
+      <div class="ai-note">${t('reg_ai_note')}</div></div>`;
+  } else ai = `<div class="ai-card off">${p.ai === 'off' ? t('reg_ai_off') : t('reg_ai_fail')}</div>`;
+  el.className = 'step done';
+  el.innerHTML = `${head}<div class="photo-row"><img src="${p.url}" alt="">${ai}</div>
+    <div style="margin-top:8px"><button type="button" class="btn-sm btn-ghost" id="photo-remove">${t('reg_remove')}</button></div>`;
+  $('#photo-remove').onclick = () => { URL.revokeObjectURL(p.url); s.photo = null; renderPhoto(); };
+  const use = $('#ai-use');
+  if (use) use.onclick = () => applySuggestion(p.suggestion);
+}
+
+function applySuggestion(sg) {
+  s.productId = sg.product_id || null;
+  s.productName = sg.product_id ? '' : sg.product_name;
+  s.categoryId = sg.waste_category_id || null;
+  if (sg.suggested_weight_kg && !s.weight) { s.weight = String(sg.suggested_weight_kg); s.unit = 'kg'; }
+  const prod = state.meta.products.find((x) => x.id === s.productId);
+  if (prod && prod.default_supplier_id) s.supplierId = prod.default_supplier_id;
+  renderPhoto(); renderWhat(); renderWeight(); renderMore(); updateSave();
+}
+
+async function resizeImage(file, max = 1280) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function handlePhoto(file) {
+  let blob;
+  try { blob = await resizeImage(file); } catch { blob = file; }
+  const photo = { url: URL.createObjectURL(blob), uploading: true, ai: 'thinking' };
+  s.photo = photo;
+  renderPhoto();
+  try {
+    const form = new FormData();
+    form.append('photo', blob, 'photo.jpg');
+    const up = (await api('/waste/photo', { method: 'POST', form })).data;
+    if (s.photo !== photo) return;
+    photo.token = up.photo_path;
+    photo.uploading = false;
+    renderPhoto(); updateSave();
+    const ai = (await api('/waste/photo/identify', { method: 'POST', body: { photo_path: photo.token } })).data;
+    if (s.photo !== photo) return;
+    if (ai && ai.available === false) { photo.ai = 'off'; renderPhoto(); updateSave(); return; }
+    if (ai && ai.ok && ai.suggestion) {
+      photo.ai = 'done'; photo.suggestion = ai.suggestion;
+      // Pre-fill only if the user hasn't chosen anything yet; never overwrite a user choice.
+      if (!s.productId && !s.productName && !s.categoryId) applySuggestion(ai.suggestion);
+    } else photo.ai = 'fail';
+  } catch (e) {
+    if (s.photo !== photo) return;
+    if (!photo.token) { toastError(e); URL.revokeObjectURL(photo.url); s.photo = null; } else photo.ai = 'fail';
+  }
+  renderPhoto(); updateSave();
+}
+
+// ------------------------------------------------------------------ what
+function recentIds() { try { return JSON.parse(localStorage.getItem(LS.recent) || '[]'); } catch { return []; } }
+
+function renderWhat() {
+  const meta = state.meta;
+  const el = $('#sec-what');
+  const done = Boolean(s.productId || s.categoryId);
+  const q = s.search.trim().toLowerCase();
+  let tiles;
+  if (q) tiles = meta.products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 12);
+  else {
+    const rec = recentIds().map((id) => meta.products.find((p) => p.id === id)).filter(Boolean);
+    const quick = meta.products.filter((p) => p.is_quick_pick && !rec.includes(p));
+    tiles = [...rec, ...quick].slice(0, 12);
+  }
+  const catLabel = (id) => (meta.waste_categories.find((c) => c.id === id) || {}).label || '';
+  const selected = s.productId ? meta.products.find((p) => p.id === s.productId) : null;
+  el.className = `step ${done ? 'done' : ''}`;
+  el.innerHTML = `
+    <div class="step-title"><span class="step-num">2</span>${t('reg_what')}</div>
+    <div class="field"><input type="search" id="what-search" placeholder="${t('reg_search')}" value="${esc(s.search)}" autocomplete="off"></div>
+    <div class="tiles">${tiles.map((p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
+      ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`).join('')}
+      ${q && !tiles.some((p) => p.name.toLowerCase() === q) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
+    </div>
+    ${!s.productId ? `<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">${t('reg_or_category')}</div>
+      <div class="chips">${meta.waste_categories.map((c) =>
+        `<button type="button" class="chip ${c.id === s.categoryId ? 'on' : ''}" data-c="${c.id}">${esc(c.label)}</button>`).join('')}</div></div>` : ''}
+    ${done ? `<div class="selected-line">${t('reg_selected')}: <strong>${esc(selected ? selected.name : (s.productName || ''))}</strong>
+      ${selected || s.productName ? ' · ' : ''}${esc(catLabel(selected ? selected.waste_category_id : s.categoryId))}</div>` : ''}`;
+  const search = $('#what-search');
+  search.oninput = () => { s.search = search.value; const pos = search.selectionStart; renderWhat(); const n = $('#what-search'); n.focus(); n.setSelectionRange(pos, pos); };
+  $$('[data-p]', el).forEach((b) => (b.onclick = () => {
+    const id = Number(b.dataset.p);
+    if (s.productId === id) { s.productId = null; s.categoryId = null; }
+    else {
+      const p = meta.products.find((x) => x.id === id);
+      s.productId = id; s.productName = ''; s.categoryId = p.waste_category_id;
+      if (p.default_supplier_id) s.supplierId = p.default_supplier_id;
+    }
+    s.search = '';
+    renderWhat(); renderMore(); updateSave(); renderPhoto();
+  }));
+  $$('[data-c]', el).forEach((b) => (b.onclick = () => {
+    const id = Number(b.dataset.c);
+    s.categoryId = s.categoryId === id ? null : id;
+    renderWhat(); updateSave(); renderPhoto();
+  }));
+  const free = $('#free-text');
+  if (free) free.onclick = () => { s.productId = null; s.productName = s.search.trim(); s.search = ''; renderWhat(); updateSave(); };
+}
+
+// ------------------------------------------------------------------ weight
+function renderWeight() {
+  const el = $('#sec-weight');
+  const done = Number(String(s.weight).replace(',', '.')) > 0;
+  el.className = `step ${done ? 'done' : ''}`;
+  el.innerHTML = `
+    <div class="step-title"><span class="step-num">3</span>${t('reg_weight')}</div>
+    <div class="weight-row">
+      <input id="weight" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(s.weight)}" aria-label="${t('reg_weight')}">
+      <div class="unit-toggle">${['g', 'kg'].map((u) => `<button type="button" class="${s.unit === u ? 'on' : ''}" data-u="${u}">${u}</button>`).join('')}</div>
+    </div>`;
+  const w = $('#weight');
+  w.oninput = () => {
+    w.value = w.value.replace(/[^0-9.,]/g, '');
+    s.weight = w.value;
+    el.classList.toggle('done', Number(s.weight.replace(',', '.')) > 0);
+    updateSave();
+  };
+  $$('[data-u]', el).forEach((b) => (b.onclick = () => {
+    s.unit = b.dataset.u; localStorage.setItem(LS.unit, s.unit); renderWeight(); updateSave();
+  }));
+}
+
+// ------------------------------------------------------------------ reason
+function renderReason() {
+  const el = $('#sec-reason');
+  el.className = `step ${s.reasonId ? 'done' : ''}`;
+  el.innerHTML = `<div class="step-title"><span class="step-num">4</span>${t('reg_reason')}</div>
+    <div class="tiles">${state.meta.waste_reasons.map((r) =>
+      `<button type="button" class="tile ${r.id === s.reasonId ? 'on' : ''}" data-reason="${r.id}">${esc(r.label)}</button>`).join('')}</div>`;
+  $$('[data-reason]', el).forEach((b) => (b.onclick = () => { s.reasonId = Number(b.dataset.reason); renderReason(); updateSave(); }));
+}
+
+// ------------------------------------------------------------------ more details
+function renderMore() {
+  const meta = state.meta;
+  const menu = meta.menu_items.filter((m) => !m.restaurant_id || m.restaurant_id === s.restaurantId);
+  const opt = (list, cur, lab = (x) => x.name) => `<option value="">${t('none')}</option>` +
+    list.map((x) => `<option value="${x.id ?? x}" ${String(x.id ?? x) === String(cur ?? '') ? 'selected' : ''}>${esc(lab(x))}</option>`).join('');
+  $('#more-body').innerHTML = `
+    <div class="field-row">
+      <div class="field"><label>${t('reg_menu_item')}</label><select id="m-menu">${opt(menu, s.menuItemId)}</select></div>
+      <div class="field"><label>${t('reg_supplier')}</label><select id="m-supplier">${opt(meta.suppliers, s.supplierId)}</select></div>
+      <div class="field"><label>${t('reg_location')}</label><select id="m-location">${opt(meta.locations, s.location, (x) => t('loc_' + x))}</select></div>
+      <div class="field"><label>${t('reg_moment')}</label><select id="m-moment">${opt(meta.moments, s.moment, (x) => t('mom_' + x))}</select></div>
+    </div>
+    <div class="field"><label>${t('reg_note')}</label><input id="m-note" maxlength="1000" value="${esc(s.note)}"></div>
+    <div class="field"><label>${t('reg_when')}</label><input id="m-when" type="datetime-local" value="${esc(s.when)}" max="${todayIso()}T23:59"></div>`;
+  $('#m-menu').onchange = (e) => (s.menuItemId = e.target.value ? Number(e.target.value) : null);
+  $('#m-supplier').onchange = (e) => (s.supplierId = e.target.value ? Number(e.target.value) : null);
+  $('#m-location').onchange = (e) => (s.location = e.target.value);
+  $('#m-moment').onchange = (e) => (s.moment = e.target.value);
+  $('#m-note').oninput = (e) => (s.note = e.target.value);
+  $('#m-when').onchange = (e) => (s.when = e.target.value);
+}
+
+// ------------------------------------------------------------------ save
+function weightNumber() { return Number(String(s.weight).replace(',', '.')); }
+
+function missing() {
+  const m = [];
+  if (!s.productId && !s.categoryId) m.push(t('product'));
+  if (!(weightNumber() > 0)) m.push(t('weight'));
+  if (!s.reasonId) m.push(t('reason'));
+  return m;
+}
+
+function updateSave() {
+  const b = $('#save-btn');
+  if (!b) return;
+  const m = missing();
+  const w = weightNumber();
+  b.disabled = m.length > 0 || s.saving || (s.photo && s.photo.uploading);
+  b.innerHTML = s.saving ? `<span class="spinner"></span>` : m.length
+    ? `${t('reg_missing')}: ${m.join(', ').toLowerCase()}`
+    : `${t('reg_save')} · ${fmt.kg(s.unit === 'g' ? w / 1000 : w, 2)}`;
+}
+
+async function save() {
+  if (missing().length || s.saving) return;
+  s.saving = true; updateSave();
+  const body = {
+    restaurant_id: s.restaurantId,
+    product_id: s.productId,
+    product_name: s.productId ? null : (s.productName || null),
+    waste_category_id: s.categoryId,
+    reason_id: s.reasonId,
+    weight: weightNumber(),
+    unit: s.unit,
+    menu_item_id: s.menuItemId,
+    supplier_id: s.supplierId,
+    location: s.location || null,
+    moment: s.moment || null,
+    note: s.note || null,
+    photo_path: s.photo && s.photo.token ? s.photo.token : null,
+  };
+  // Store the AI suggestion and whether the user accepted it (measures AI accuracy later)
+  const sg = s.photo && s.photo.suggestion;
+  if (sg) {
+    body.ai_suggestion = sg;
+    body.ai_accepted = sg.waste_category_id === s.categoryId && (!sg.product_id || sg.product_id === s.productId);
+  }
+  if (s.when) body.recorded_at = new Date(s.when).toISOString();
+  try {
+    const rec = (await api('/waste', { method: 'POST', body })).data;
+    if (s.productId) {
+      const ids = [s.productId, ...recentIds().filter((x) => x !== s.productId)].slice(0, 6);
+      localStorage.setItem(LS.recent, JSON.stringify(ids));
+    }
+    const catName = (state.meta.waste_categories.find((c) => c.id === rec.waste_category_id) || {}).label || '';
+    toast(`${t('reg_saved')}: ${fmt.kg(rec.weight_kg, 2)} ${rec.product_name || catName} (${fmt.money(rec.purchase_value, 2)})`);
+    if (s.photo) URL.revokeObjectURL(s.photo.url);
+    s = freshState({ restaurantId: s.restaurantId });
+    $('#sec-more').open = false;
+    renderAll();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    loadToday();
+  } catch (e) {
+    s.saving = false; updateSave(); toastError(e);
+  }
+}
+
+// ------------------------------------------------------------------ today
+async function loadToday() {
+  const el = $('#sec-today');
+  if (!el) return;
+  try {
+    const res = await api('/waste', { query: { mine: '1', from: todayIso(), to: todayIso(), restaurant_id: s.restaurantId, limit: 50 } });
+    const rows = res.data;
+    el.innerHTML = `<h2>${t('reg_today')} <span class="muted small">· ${fmt.kg(res.meta.total_kg, 1)} · ${fmt.money(res.meta.total_value, 2)}</span></h2>
+      ${rows.length ? `<ul>${rows.map((r) => `<li><div><strong>${fmt.kg(r.weight_kg, 2)}</strong> ${esc(r.product_name || r.category)}
+        <div class="small muted">${fmt.time(r.recorded_at)} · ${esc(r.reason)}${r.has_photo ? ' · &#128247;' : ''}</div></div>
+        <button class="btn-sm btn-ghost btn-danger" data-del="${r.id}">${t('delete')}</button></li>`).join('')}</ul>`
+    : `<p class="muted">${t('reg_nothing_today')}</p>`}`;
+    $$('[data-del]', el).forEach((b) => (b.onclick = async () => {
+      if (!(await confirmDialog(t('confirm_delete')))) return;
+      try { await api(`/waste/${b.dataset.del}`, { method: 'DELETE' }); loadToday(); } catch (e) { toastError(e); }
+    }));
+  } catch (e) { el.innerHTML = ''; }
+}
