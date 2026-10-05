@@ -79,17 +79,21 @@ Deno.serve(async (req) => {
         ] }],
       }),
     });
-    if (!res.ok) return json({ ok: true, data: { ok: false, available: true, error: `AI provider HTTP ${res.status}` } });
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 300);
+      console.error(`identify-food: AI provider HTTP ${res.status} model=${MODEL} ${detail}`);
+      return json({ ok: true, data: { ok: false, available: true, error: `AI provider HTTP ${res.status}` } });
+    }
     const out = await res.json();
     const text = (out.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
     const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } });
+    if (!m) { console.error('identify-food: no JSON in AI answer', text.slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
     const s = JSON.parse(m[0]);
     // Validate
     const valid = typeof s.product === 'string' && s.product.length > 0 && s.product.length <= 80 &&
       typeof s.category_code === 'string' && typeof s.confidence === 'number' && s.confidence >= 0 && s.confidence <= 1 &&
       (s.suggested_weight_kg == null || (typeof s.suggested_weight_kg === 'number' && s.suggested_weight_kg > 0 && s.suggested_weight_kg <= 200));
-    if (!valid) return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } });
+    if (!valid) { console.error('identify-food: AI answer failed validation', m[0].slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
     const cat = categories.find((c) => c.code === s.category_code) || null;
     const product = matchProduct(s.product, products);
     return json({ ok: true, data: { ok: true, available: true, suggestion: {
@@ -104,6 +108,7 @@ Deno.serve(async (req) => {
       provider: 'anthropic',
     } } });
   } catch (e) {
+    console.error('identify-food: error', String((e as Error).message || e));
     return json({ ok: true, data: { ok: false, available: true, error: String((e as Error).message || e) } });
   }
 });
