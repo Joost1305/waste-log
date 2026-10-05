@@ -5,8 +5,8 @@
 // - Always a suggestion: the user confirms or corrects in the app.
 import { admin, caller, cors, fail, json } from '../_shared/common.ts';
 
-const KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
-const MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
+// Secrets are read per request, so a newly added key works without redeploying.
+const env = () => ({ KEY: Deno.env.get('ANTHROPIC_API_KEY') || '', MODEL: Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5' });
 
 function norm(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
   const sb = admin();
   const me = await caller(req, sb);
   if (!me || !me.organization_id) return fail(401, 'Not signed in');
+  const { KEY, MODEL } = env();
   if (!KEY) return json({ ok: true, data: { ok: false, available: false } });
 
   let body: { photo_path?: string; lang?: string };
