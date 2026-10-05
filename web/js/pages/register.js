@@ -16,7 +16,7 @@ function freshState(keep = {}) {
     unit: localStorage.getItem(LS.unit) || 'kg',
     photo: null, // { url, token, uploading, ai: 'thinking'|'done'|'off'|'fail', suggestion }
     productId: null, productName: '', categoryId: null, search: '',
-    weight: '', reasonId: null,
+    weight: '', weightSource: 'manual', reasonId: null,
     menuItemId: null, supplierId: null, location: '', moment: defaultMoment(), note: '', when: '',
     saving: false,
   };
@@ -105,10 +105,19 @@ function applySuggestion(sg) {
   s.productId = sg.product_id || null;
   s.productName = sg.product_id ? '' : sg.product_name;
   s.categoryId = sg.waste_category_id || null;
-  if (sg.suggested_weight_kg && !s.weight) { s.weight = String(sg.suggested_weight_kg); s.unit = 'kg'; }
+  applyWeight(sg);
   const prod = state.meta.products.find((x) => x.id === s.productId);
   if (prod && prod.default_supplier_id) s.supplierId = prod.default_supplier_id;
   renderPhoto(); renderWhat(); renderWeight(); renderMore(); updateSave();
+}
+
+// Fill the weight from the AI (read from a scale display, or estimated) unless the user typed one.
+function applyWeight(sg) {
+  if (!sg || !sg.suggested_weight_kg || s.weight) return;
+  const kg = Number(sg.suggested_weight_kg);
+  if (kg < 1) { s.unit = 'g'; s.weight = String(Math.round(kg * 1000)); }
+  else { s.unit = 'kg'; s.weight = String(Math.round(kg * 100) / 100).replace('.', ','); }
+  s.weightSource = sg.weight_source === 'scale' ? 'scale' : 'estimate';
 }
 
 async function resizeImage(file, max = 1280) {
@@ -144,6 +153,7 @@ async function handlePhoto(file) {
       photo.ai = 'done'; photo.suggestion = ai.suggestion;
       // Pre-fill only if the user hasn't chosen anything yet; never overwrite a user choice.
       if (!s.productId && !s.productName && !s.categoryId) applySuggestion(ai.suggestion);
+      else if (!s.weight) { applyWeight(ai.suggestion); renderWeight(); }
     } else photo.ai = 'fail';
   } catch (e) {
     if (s.photo !== photo) return;
@@ -214,17 +224,30 @@ function renderWeight() {
     <div class="weight-row">
       <input id="weight" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(s.weight)}" aria-label="${t('reg_weight')}">
       <div class="unit-toggle">${['g', 'kg'].map((u) => `<button type="button" class="${s.unit === u ? 'on' : ''}" data-u="${u}">${u}</button>`).join('')}</div>
-    </div>`;
+    </div>
+    <div id="weight-note"></div>`;
+  renderWeightNote();
   const w = $('#weight');
   w.oninput = () => {
     w.value = w.value.replace(/[^0-9.,]/g, '');
     s.weight = w.value;
+    s.weightSource = 'manual';          // typed or corrected by the user
+    renderWeightNote();
     el.classList.toggle('done', Number(s.weight.replace(',', '.')) > 0);
     updateSave();
   };
   $$('[data-u]', el).forEach((b) => (b.onclick = () => {
+    if (b.dataset.u !== s.unit) s.weightSource = 'manual';
     s.unit = b.dataset.u; localStorage.setItem(LS.unit, s.unit); renderWeight(); updateSave();
   }));
+}
+
+function renderWeightNote() {
+  const n = $('#weight-note');
+  if (!n) return;
+  n.innerHTML = s.weightSource === 'estimate' && s.weight
+    ? `<div class="weight-note estimate">${t('reg_w_estimate')}</div>`
+    : s.weightSource === 'scale' && s.weight ? `<div class="weight-note scale">${t('reg_w_scale')}</div>` : '';
 }
 
 // ------------------------------------------------------------------ reason
@@ -299,6 +322,7 @@ async function save() {
     moment: s.moment || null,
     note: s.note || null,
     photo_path: s.photo && s.photo.token ? s.photo.token : null,
+    weight_source: s.weightSource,
   };
   // Store the AI suggestion and whether the user accepted it (measures AI accuracy later)
   const sg = s.photo && s.photo.suggestion;

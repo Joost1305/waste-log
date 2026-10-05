@@ -45,7 +45,7 @@ const dict = {
     profile_title: 'Profile', current_password: 'Current password', change_password: 'Change password', saved: 'Saved',
     loc_kitchen: 'Kitchen', loc_storage: 'Storage', loc_buffet: 'Buffet', loc_service: 'Service', loc_bar: 'Bar', loc_pastry: 'Pastry',
     mom_breakfast: 'Breakfast', mom_lunch: 'Lunch', mom_dinner: 'Dinner', mom_event: 'Event', mom_prep: 'Prep', mom_closing: 'Closing',
-    weather_sync: 'Fetch weather', trend_guest: 'Waste per guest per week (g)', g_per_guest: 'g / guest', restaurants_count: 'Restaurants', create_org: 'New organization',
+    weather_sync: 'Fetch weather', trend_guest: 'Waste per guest per week (g)', reg_w_estimate: 'Estimated by AI from the photo. Check it and correct it if needed.', reg_w_scale: 'Read from the scale by AI. Quick check.', badge_estimate: 'estimated', est_note: '{p}% of the kilos were estimated by AI, not weighed.', g_per_guest: 'g / guest', restaurants_count: 'Restaurants', create_org: 'New organization',
   },
   nl: {
     demo_banner: 'DEMO DATA: fictieve gegevens voor demonstratie',
@@ -89,7 +89,7 @@ const dict = {
     profile_title: 'Profiel', current_password: 'Huidig wachtwoord', change_password: 'Wachtwoord wijzigen', saved: 'Opgeslagen',
     loc_kitchen: 'Keuken', loc_storage: 'Opslag', loc_buffet: 'Buffet', loc_service: 'Bediening', loc_bar: 'Bar', loc_pastry: 'Patisserie',
     mom_breakfast: 'Ontbijt', mom_lunch: 'Lunch', mom_dinner: 'Diner', mom_event: 'Evenement', mom_prep: 'Mise en place', mom_closing: 'Afsluiten',
-    weather_sync: 'Weer ophalen', trend_guest: 'Waste per gast per week (g)', g_per_guest: 'g / gast', restaurants_count: 'Restaurants', create_org: 'Nieuwe organisatie',
+    weather_sync: 'Weer ophalen', trend_guest: 'Waste per gast per week (g)', reg_w_estimate: 'Geschat door AI op basis van de foto. Controleer en pas aan als het niet klopt.', reg_w_scale: 'Afgelezen van de weegschaal door AI. Even controleren.', badge_estimate: 'geschat', est_note: '{p}% van de kilo\'s is door AI geschat en niet gewogen.', g_per_guest: 'g / gast', restaurants_count: 'Restaurants', create_org: 'Nieuwe organisatie',
   },
 };
 

@@ -3,6 +3,7 @@
 // - Without ANTHROPIC_API_KEY it answers { available: false } and the app continues manually.
 // - Output is validated and mapped onto the organization's own categories and products.
 // - Always a suggestion: the user confirms or corrects in the app.
+// - Weight: read from a visible scale display (weight_source "scale") or estimated ("estimate").
 import { admin, caller, cors, fail, json } from '../_shared/common.ts';
 
 // Secrets are read per request, so a newly added key works without redeploying.
@@ -61,9 +62,11 @@ Deno.serve(async (req) => {
     'You help a professional kitchen register food waste. Look at the photo and identify the main food that is being thrown away.',
     `Choose category_code from exactly this list: ${categories.map((c) => c.code).join(', ')}.`,
     `If it clearly matches one of the kitchen's own products, use that product name: ${products.slice(0, 80).map((p) => p.name).join('; ')}.`,
-    'Only estimate suggested_weight_kg if a scale display or a clear reference makes it reliable; otherwise null.',
+    'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
+    'Otherwise estimate the weight of the wasted food in kg from its size, the container and any reference objects, and set weight_source to "estimate".',
+    'Only use null for suggested_weight_kg if there is no visible food at all.',
     'confidence is your honest probability (0-1) that product and category are right.',
-    'Answer with ONLY a JSON object: {"product": string, "category_code": string, "subcategory": string|null, "confidence": number, "suggested_weight_kg": number|null}',
+    'Answer with ONLY a JSON object: {"product": string, "category_code": string, "subcategory": string|null, "confidence": number, "suggested_weight_kg": number|null, "weight_source": "scale"|"estimate"|null}',
   ].join('\n');
 
   try {
@@ -92,7 +95,8 @@ Deno.serve(async (req) => {
     // Validate
     const valid = typeof s.product === 'string' && s.product.length > 0 && s.product.length <= 80 &&
       typeof s.category_code === 'string' && typeof s.confidence === 'number' && s.confidence >= 0 && s.confidence <= 1 &&
-      (s.suggested_weight_kg == null || (typeof s.suggested_weight_kg === 'number' && s.suggested_weight_kg > 0 && s.suggested_weight_kg <= 200));
+      (s.suggested_weight_kg == null || (typeof s.suggested_weight_kg === 'number' && s.suggested_weight_kg > 0 && s.suggested_weight_kg <= 200)) &&
+      (s.weight_source == null || s.weight_source === 'scale' || s.weight_source === 'estimate');
     if (!valid) { console.error('identify-food: AI answer failed validation', m[0].slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
     const cat = categories.find((c) => c.code === s.category_code) || null;
     const product = matchProduct(s.product, products);
@@ -104,7 +108,8 @@ Deno.serve(async (req) => {
       category_code: cat?.code ?? null,
       subcategory: typeof s.subcategory === 'string' ? s.subcategory.slice(0, 80) : null,
       confidence: Math.round(s.confidence * 100) / 100,
-      suggested_weight_kg: s.suggested_weight_kg ?? null,
+      suggested_weight_kg: s.suggested_weight_kg != null ? Math.round(s.suggested_weight_kg * 1000) / 1000 : null,
+      weight_source: s.suggested_weight_kg != null ? (s.weight_source === 'scale' ? 'scale' : 'estimate') : null,
       provider: 'anthropic',
     } } });
   } catch (e) {

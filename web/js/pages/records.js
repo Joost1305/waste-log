@@ -46,7 +46,7 @@ async function load() {
           <td><span class="dot" style="background:${esc(r.category_color || '#999')}"></span>${esc(r.category)}</td>
           <td>${esc(r.reason)}</td>
           ${state.meta.restaurants.length > 1 ? `<td>${esc(r.restaurant_name)}</td>` : ''}
-          <td class="right num">${fmt.kg(r.weight_kg, 2)}</td>
+          <td class="right num">${fmt.kg(r.weight_kg, 2)}${r.weight_source === 'estimate' ? ` <span class="badge warn" title="${t('reg_w_estimate')}">${t('badge_estimate')}</span>` : ''}</td>
           <td class="right num" title="${t('val_' + r.valuation_method)} · ${fmt.money(r.unit_cost_per_kg, 2)}/kg">${fmt.money(r.purchase_value, 2)}</td>
           <td class="small">${esc(r.user_name || '')}</td>
           <td class="actions">${editable ? `<button class="btn-sm" data-edit="${r.id}">${t('edit')}</button>

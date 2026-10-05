@@ -144,3 +144,15 @@ test('audit log records changes and is readable only by org admins', async () =>
   const m = await as(db, U['manager.amsterdam@hth'], async ({ q }) => (await q('select count(*)::int n from audit_log'))[0].n);
   assert.equal(m, 0);
 });
+
+test('weight source: AI estimate is stored, and a later correction makes it manual', async () => {
+  const rec = await as(db, U['student@hth'], async ({ q }) => (await q(
+    `insert into waste_records (restaurant_id, waste_category_id, reason_id, weight_kg, user_id, weight_source)
+     values ($1, $2, $3, 1.5, auth.uid(), 'estimate') returning id, weight_source`, [ID.ams, ID.prepared, ID.spoilage]))[0]);
+  assert.equal(rec.weight_source, 'estimate');
+  const after = await as(db, U['student@hth'], async ({ q }) => (await q(
+    'update waste_records set weight_kg = 1.2 where id = $1 returning weight_source', [rec.id]))[0]);
+  assert.equal(after.weight_source, 'manual');
+  const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select dashboard() d')).d);
+  assert.ok('estimated_kg_pct' in d.data_quality);
+});

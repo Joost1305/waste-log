@@ -174,6 +174,7 @@ route('POST', '/waste', async ({ body }) => {
   const me = ctx.profile || await profile();
   const row = { ...wasteRow(body), user_id: me.id };
   if (body.photo_path) row.photo_path = body.photo_path;
+  if (['manual', 'scale', 'estimate'].includes(body.weight_source)) row.weight_source = body.weight_source;
   if (body.ai_suggestion) { row.ai_suggestion = body.ai_suggestion; row.ai_accepted = body.ai_accepted ?? null; }
   if (row.weight_kg > 500) throw new ApiError(400, 'Weight above 500 kg in one record, please check the unit');
   return check(await sb.from('waste_records').insert(row).select('id, product_name, waste_category_id, weight_kg, purchase_value, valuation_method').single());

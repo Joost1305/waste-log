@@ -185,3 +185,8 @@ td.actions { white-space: nowrap; text-align: right; }
 .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .grid > .card + .card, .grid > .card { margin-top: 0; }
+
+.weight-note { margin-top: 8px; font-size: .85rem; border-radius: var(--radius-sm); padding: 7px 10px; }
+.weight-note.estimate { background: var(--accent-soft); color: #8a4a22; }
+.weight-note.scale { background: var(--primary-soft); color: var(--primary); }
+.badge.warn { background: var(--accent-soft); color: var(--accent); }

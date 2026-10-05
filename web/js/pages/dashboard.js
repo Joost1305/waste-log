@@ -111,6 +111,7 @@ function draw(d) {
       d.top_products.map((r) => [esc(r.name), fmt.kg(r.kg, 0), fmt.money(r.value), fmt.num(r.records)]),
       [false, true, true, true])}
       <div class="note">${t('dq_note', { p: fmt.num(d.data_quality.priced_pct), v: fmt.money(state.meta.organization.default_value_per_kg, 2) })}</div>
+      ${d.data_quality.estimated_kg_pct > 0 ? `<div class="note">${t('est_note', { p: fmt.num(d.data_quality.estimated_kg_pct, 1) })}</div>` : ''}
       <div class="note">${t('rate_note')}</div>
     </div>`;
 
