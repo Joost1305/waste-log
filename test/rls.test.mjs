@@ -156,3 +156,16 @@ test('weight source: AI estimate is stored, and a later correction makes it manu
   const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select dashboard() d')).d);
   assert.ok('estimated_kg_pct' in d.data_quality);
 });
+
+test('gallery: heaviest photos first, only within scope', async () => {
+  for (const kg of [0.4, 3.2, 1.1]) {
+    await as(db, U['student@hth'], ({ q }) => q(
+      `insert into waste_records (restaurant_id, waste_category_id, reason_id, weight_kg, user_id, photo_path)
+       values ($1, $2, $3, $4, auth.uid(), $5)`, [ID.ams, ID.prepared, ID.spoilage, kg, `org-${ID.hth}/2026-10/test-${kg}.jpg`]));
+  }
+  const g = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select gallery() g')).g);
+  const w = g.rows.map((r) => Number(r.weight_kg));
+  assert.deepEqual(w.slice(0, 3), [3.2, 1.1, 0.4]);
+  const b = await as(db, U['admin@bistro'], async ({ one }) => (await one('select gallery() g')).g);
+  assert.equal(b.total, 0);
+});

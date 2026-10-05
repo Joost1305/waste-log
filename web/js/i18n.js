@@ -5,7 +5,7 @@ export const LANGS = { nl: 'Nederlands', en: 'English' };
 const dict = {
   en: {
     demo_banner: 'DEMO DATA: fictional data for demonstration',
-    nav_register: 'Register', nav_records: 'Records', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out',
+    nav_register: 'Register', nav_records: 'Records', nav_gallery: 'Gallery', gal_title: 'Photo gallery', gal_sub: 'Heaviest waste first: see where the impact is.', gal_7: 'Last 7 days', gal_all: 'All time', gal_more: 'Show more', gal_photos: 'photos', gal_empty: 'No photos in this selection yet. Photos appear here when waste is registered with a photo.', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out',
     login_title: 'Sign in', login_sub: 'Food waste registration & insight', email: 'Email', password: 'Password', sign_in: 'Sign in',
     demo_accounts: 'Demo accounts (password demo1234):',
     reg_title: 'Register waste', reg_restaurant: 'Restaurant',
@@ -49,7 +49,7 @@ const dict = {
   },
   nl: {
     demo_banner: 'DEMO DATA: fictieve gegevens voor demonstratie',
-    nav_register: 'Registreren', nav_records: 'Registraties', nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen',
+    nav_register: 'Registreren', nav_records: 'Registraties', nav_gallery: 'Galerij', gal_title: 'Fotogalerij', gal_sub: 'Grootste gewichten bovenaan: zie waar de impact zit.', gal_7: 'Laatste 7 dagen', gal_all: 'Alles', gal_more: 'Meer tonen', gal_photos: "foto's", gal_empty: "Nog geen foto's in deze selectie. Foto's verschijnen hier zodra waste met een foto wordt geregistreerd.", nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen',
     login_title: 'Inloggen', login_sub: 'Voedselverspilling registreren en verbeteren', email: 'E-mail', password: 'Wachtwoord', sign_in: 'Inloggen',
     demo_accounts: 'Demo-accounts (wachtwoord demo1234):',
     reg_title: 'Waste registreren', reg_restaurant: 'Restaurant',

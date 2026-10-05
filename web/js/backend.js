@@ -194,6 +194,15 @@ route('POST', '/waste/photo', async ({ form }) => {
 });
 route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food', { photo_path: body.photo_path, lang: ctx.lang }));
 
+// gallery: photos, heaviest first
+route('GET', '/gallery', async ({ query }) => {
+  const res = check(await sb.rpc('gallery', {
+    p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
+    p_category: num(query.waste_category_id), p_limit: num(query.limit) || 24, p_offset: num(query.offset) || 0, p_lang: ctx.lang,
+  }));
+  return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
+});
+
 // dashboard
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang,
@@ -204,6 +213,15 @@ export async function photoUrl(path) {
   const { data, error } = await sb.storage.from(PHOTO_BUCKET).createSignedUrl(path, 300);
   if (error) throw new ApiError(404, 'Photo not found');
   return data.signedUrl;
+}
+
+// Signed links for many photos at once (one request). Missing or forbidden photos are left out.
+export async function photoUrls(paths) {
+  const list = [...new Set(paths.filter(Boolean))];
+  if (!list.length) return {};
+  const { data, error } = await sb.storage.from(PHOTO_BUCKET).createSignedUrls(list, 3600);
+  if (error) return {};
+  return Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
 }
 
 export async function request(path, { method = 'GET', body, form, query = {} } = {}) {

@@ -4,6 +4,7 @@ import { t, setLang } from './i18n.js';
 import { renderLogin } from './pages/login.js';
 import { renderRegister } from './pages/register.js';
 import { renderRecords } from './pages/records.js';
+import { renderGallery } from './pages/gallery.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderSettings } from './pages/settings.js';
 import { renderProfile } from './pages/profile.js';
@@ -12,6 +13,7 @@ const routes = [
   { path: 'register', render: renderRegister, nav: 'nav_register', show: () => true },
   { path: 'dashboard', render: renderDashboard, nav: 'nav_dashboard', show: (p) => p.dashboard },
   { path: 'records', render: renderRecords, nav: 'nav_records', show: () => true },
+  { path: 'gallery', render: renderGallery, nav: 'nav_gallery', show: () => true },
   { path: 'settings', render: renderSettings, nav: 'nav_settings', show: (p) => p.catalog || p.users },
   { path: 'profile', render: renderProfile, nav: 'nav_profile', show: () => true },
 ];
