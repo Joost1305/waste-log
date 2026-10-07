@@ -1,11 +1,13 @@
 // Management dashboard. All numbers come from the dashboard() database function.
 // Chart rules: one measure per chart (no dual axes), single hue for single-series
 // charts, recessive grid, hover tooltips on every chart, tables next to charts.
-import { state, api, app, esc, fmt, toastError, todayIso, addDaysIso, $, $$ } from '../core.js';
+import { state, api, app, esc, fmt, toastError, todayIso, addDaysIso, $, $$, printHeader, printPage } from '../core.js';
 import { t } from '../i18n.js';
+import { exportDashboard } from '../export.js';
+import { showCo2Info } from '../co2.js';
 
 const charts = [];
-let q;
+let q; let last = null;
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
@@ -13,8 +15,12 @@ export async function renderDashboard() {
   q = { preset: '12w', restaurant_id: '', from: addDaysIso(todayIso(), -83), to: todayIso() };
   const meta = state.meta;
   app().innerHTML = `
-    <div class="page-head"><div><h1>${t('dash_title')}</h1><div class="muted small" id="dash-period"></div></div></div>
-    <form class="card filters" id="dash-filters">
+    <div id="dash-print-head"></div>
+    <div class="page-head"><div><h1>${t('dash_title')}</h1><div class="muted small" id="dash-period"></div></div>
+      <div class="page-actions no-print">
+        <button type="button" class="btn-sm" id="dash-print">&#128424; ${t('print')}</button>
+        <button type="button" class="btn-sm" id="dash-xlsx">&#11015; ${t('export_xlsx')}</button></div></div>
+    <form class="card filters no-print" id="dash-filters">
       ${meta.restaurants.length > 1 ? `<div><label>${t('restaurant')}</label><select name="restaurant_id"><option value="">${t('all_restaurants')}</option>
         ${meta.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div>` : ''}
       <div><label>${t('period')}</label><select name="preset">
@@ -34,6 +40,8 @@ export async function renderDashboard() {
     }
     load();
   };
+  $('#dash-print').onclick = () => printPage();
+  $('#dash-xlsx').onclick = () => { if (last) exportDashboard(last, q); };
   load();
 }
 
@@ -41,6 +49,7 @@ async function load() {
   const body = $('#dash-body');
   try {
     const d = (await api('/dashboard', { query: { restaurant_id: q.restaurant_id, from: q.from, to: q.to } })).data;
+    last = d;
     draw(d);
   } catch (e) { toastError(e); body.innerHTML = ''; }
 }
@@ -55,10 +64,14 @@ function draw(d) {
   charts.splice(0).forEach((c) => c.destroy());
   const T = d.totals;
   $('#dash-period').textContent = `${fmt.date(d.period.from)} – ${fmt.date(d.period.to)}`;
+  const restName = q.restaurant_id ? (state.meta.restaurants.find((r) => r.id === Number(q.restaurant_id)) || {}).name : t('all_restaurants');
+  $('#dash-print-head').innerHTML = printHeader(t('dash_title'), `${restName} · ${fmt.date(d.period.from)} – ${fmt.date(d.period.to)}`);
   const body = $('#dash-body');
   if (!T.records) { body.innerHTML = `<div class="card empty">${t('no_data')}</div>`; return; }
 
   const tg = d.target;
+  const period = (tg && tg.period) || 'month';
+  const per = t('per_' + period);
   const targetHtml = tg ? `
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -67,9 +80,9 @@ function draw(d) {
       </div>
       <div class="progress ${tg.achieved ? 'done' : ''}"><div style="width:${Math.min(100, tg.progress_pct)}%"></div></div>
       <div class="target-nums">
-        <span>${t('baseline')}: <strong>${fmt.kg(tg.baseline_kg, 0)}</strong></span>
-        <span>${t('current_30')}: <strong>${fmt.kg(tg.current_kg, 0)}</strong></span>
-        <span>${t('goal')}: <strong>${fmt.kg(tg.target_kg, 0)}</strong> (−${fmt.pct(tg.reduction_goal_pct)})</span>
+        <span>${t('baseline')}: <strong>${fmt.kg(tg.baseline_kg, 0)}</strong> ${per}</span>
+        <span>${t('win_' + period)}: <strong>${fmt.kg(tg.current_kg, 0)}</strong></span>
+        <span>${t('goal')}: <strong>${fmt.kg(tg.target_kg, 0)}</strong> ${per} (−${fmt.pct(tg.reduction_goal_pct)})</span>
         <span>${t('progress')}: <strong>${fmt.pct(tg.progress_pct)}</strong></span>
       </div>
     </div>` : `<div class="card muted small">${t('target_none')}</div>`;
@@ -77,13 +90,14 @@ function draw(d) {
   const showRest = state.meta.restaurants.length > 1 && !q.restaurant_id;
   body.innerHTML = `
     <div class="grid grid-kpi">
-      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}</div>
+      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div></div>
       <div class="card kpi"><div class="label">${t('kpi_cost')}</div><div class="value">${fmt.money(T.value)}</div>
         <div class="delta muted">${t('purchase_value')}</div></div>
       <div class="card kpi"><div class="label">${t('kpi_per_guest')}</div><div class="value">${T.g_per_guest != null ? `${fmt.num(T.g_per_guest)} g` : '–'}</div>
         <div class="delta muted">${fmt.num(T.guests)} ${t('guests').toLowerCase()}</div></div>
-      <div class="card kpi"><div class="label">${t('kpi_co2')}</div><div class="value">${fmt.num(T.co2e_kg / 1000, 1)} t</div>
-        <div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div></div>
+      <button type="button" class="card kpi kpi-link" id="kpi-co2" title="${t('co2_hint')}"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
+        <div class="value">${T.co2e_kg >= 1000 ? `${fmt.num(T.co2e_kg / 1000, 1)} t` : fmt.kg(T.co2e_kg, 0)}</div>
+        <div class="delta muted link-ish">${t('co2_short')}</div></button>
     </div>
     <div style="margin-top:16px">${targetHtml}</div>
     <div class="grid grid-2" style="margin-top:16px">
@@ -114,6 +128,8 @@ function draw(d) {
       ${d.data_quality.estimated_kg_pct > 0 ? `<div class="note">${t('est_note', { p: fmt.num(d.data_quality.estimated_kg_pct, 1) })}</div>` : ''}
       <div class="note">${t('rate_note')}</div>
     </div>`;
+
+  $('#kpi-co2').onclick = () => showCo2Info();
 
   const ink2 = css('--ink-2'); const line = css('--line'); const primary = css('--primary');
   const base = {

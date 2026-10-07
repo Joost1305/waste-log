@@ -1,6 +1,7 @@
 // App shell and router (hash based, no build step).
-import { state, api, loadMeta, $, esc, app, toastError } from './core.js';
+import { state, api, loadMeta, $, esc, app, toastError, renderLangToggle } from './core.js';
 import { t, setLang } from './i18n.js';
+import { resetCo2Cache } from './co2.js';
 import { renderLogin } from './pages/login.js';
 import { renderRegister } from './pages/register.js';
 import { renderRecords } from './pages/records.js';
@@ -27,7 +28,7 @@ async function ensureSession() {
   try {
     const me = await api('/auth/me');
     state.user = me.data.user;
-    setLang(state.user.language || 'nl');
+    setLang(state.user.language || 'en');
     if (state.user.role !== 'super_admin') state.orgId = state.user.organization_id;
     await loadMeta();
     return true;
@@ -47,6 +48,8 @@ async function renderShell() {
     `<a href="#/logout">${t('nav_logout')}</a>`;
   nav.classList.remove('open');
   $('#menu-toggle').onclick = () => nav.classList.toggle('open');
+
+  renderLangToggle($('#lang-toggle'));
 
   banner.hidden = !state.meta.organization || !state.meta.organization.is_demo;
   banner.textContent = t('demo_banner');
@@ -89,5 +92,5 @@ async function route() {
 }
 
 window.addEventListener('hashchange', route);
-window.addEventListener('fw:lang', async () => { await loadMeta(); route(); });
+window.addEventListener('fw:lang', async () => { resetCo2Cache(); if (state.user) await loadMeta(); route(); });
 route();

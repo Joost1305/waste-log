@@ -2,6 +2,7 @@
 // organization, audit log and (super admin) organizations. One generic CRUD view.
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, loadMeta, labelOf } from '../core.js';
 import { t, LANGS } from '../i18n.js';
+import { exportAll } from '../export.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
 
@@ -62,17 +63,22 @@ function sections() {
       ],
     },
     p.dashboard && {
-      key: 'targets', title: t('set_targets'), endpoint: '/targets', canCreate: p.targets, canEdit: false, canDelete: p.targets,
+      key: 'targets', title: t('set_targets'), endpoint: '/targets', canCreate: p.targets, canEdit: p.targets, canDelete: p.targets,
       columns: [
         [t('name'), (r) => esc(r.name)], [t('restaurant'), (r) => esc(r.restaurant_name || t('whole_org'))],
-        [t('baseline'), (r) => fmt.kg(r.baseline_kg, 0), true], [t('goal'), (r) => fmt.kg(r.target_kg, 0), true],
-        [t('start_date'), (r) => fmt.date(r.start_date)],
+        [t('period_label'), (r) => t('period_' + (r.period || 'month'))],
+        [t('baseline'), (r) => `${fmt.kg(r.baseline_kg, 0)} <span class="muted small">${t('per_' + (r.period || 'month'))}</span>`, true],
+        [t('goal'), (r) => `${fmt.kg(r.target_kg, 0)} <span class="muted small">${t('per_' + (r.period || 'month'))}</span>`, true],
+        [t('start_date'), (r) => fmt.date(r.start_date)], [t('end_date'), (r) => (r.end_date ? fmt.date(r.end_date) : '–')],
       ],
       fields: () => [
+        { name: 'help', label: t('target_help'), type: 'help' },
         { name: 'name', label: t('name'), required: true },
         { name: 'restaurant_id', label: t('restaurant'), type: 'select', blankLabel: t('whole_org'), options: restOpts() },
-        { name: 'baseline_kg', label: t('baseline_kg'), type: 'number', required: true },
-        { name: 'target_kg', label: t('target_kg'), type: 'number', required: true },
+        { name: 'period', label: t('period_label'), type: 'select', blank: false, numericValue: false, default: 'month',
+          options: ['week', 'month', 'year'].map((v) => ({ value: v, label: t('period_' + v) })) },
+        { name: 'baseline_kg', label: t('baseline_kg'), type: 'number', step: '0.1', required: true },
+        { name: 'target_kg', label: t('target_kg'), type: 'number', step: '0.1', required: true },
         { name: 'start_date', label: t('start_date'), type: 'date', required: true, default: todayIso() },
         { name: 'end_date', label: t('end_date'), type: 'date' },
       ],
@@ -104,6 +110,7 @@ function sections() {
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
     },
+    p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
     p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
     p.organizations && {
@@ -185,6 +192,26 @@ async function renderOrg(el) {
   $('#org-form').onsubmit = async (e) => {
     e.preventDefault();
     try { await api('/organization', { method: 'PATCH', body: readForm(el, fields) }); await loadMeta(); toast(t('org_saved')); } catch (err) { toastError(err); }
+  };
+}
+
+function renderExport(el) {
+  const meta = state.meta;
+  el.innerHTML = `<form class="card" id="exp-form"><h2>${t('export_title')}</h2>
+    <p class="muted small">${t('export_sub')}</p>
+    <div class="field-row">
+      ${meta.restaurants.length > 1 ? `<div class="field"><label>${t('restaurant')}</label><select name="restaurant_id"><option value="">${t('all_restaurants')}</option>
+        ${meta.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div>` : ''}
+      <div class="field"><label>${t('from')}</label><input type="date" name="from"></div>
+      <div class="field"><label>${t('to')}</label><input type="date" name="to"></div>
+    </div>
+    <button class="btn-primary" type="submit">&#11015; ${t('export_xlsx')}</button></form>`;
+  $('#exp-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const fm = e.target; const btn = fm.querySelector('button[type=submit]');
+    btn.disabled = true;
+    await exportAll({ restaurant_id: fm.restaurant_id ? fm.restaurant_id.value : '', from: fm.from.value, to: fm.to.value });
+    btn.disabled = false;
   };
 }
 

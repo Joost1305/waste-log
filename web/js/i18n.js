@@ -1,11 +1,11 @@
 // UI translations. To add Frisian: copy the `en` block to `fy`, translate the values,
 // and add 'fy' to LANGS. Taxonomy labels (categories, reasons) come from the database.
-export const LANGS = { nl: 'Nederlands', en: 'English' };
+export const LANGS = { en: 'English', nl: 'Nederlands' };
 
 const dict = {
   en: {
     demo_banner: 'DEMO DATA: fictional data for demonstration',
-    nav_register: 'Register', nav_records: 'Records', nav_gallery: 'Gallery', gal_title: 'Photo gallery', gal_sub: 'Heaviest waste first: see where the impact is.', gal_7: 'Last 7 days', gal_all: 'All time', gal_more: 'Show more', gal_photos: 'photos', gal_empty: 'No photos in this selection yet. Photos appear here when waste is registered with a photo.', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out',
+    nav_register: 'Register', nav_records: 'Records', nav_gallery: 'Gallery', gal_title: 'Photo gallery', gal_7: 'Last 7 days', gal_all: 'All time', gal_more: 'Show more', gal_photos: 'photos', gal_empty: 'No photos in this selection yet. Photos appear here when waste is registered with a photo.', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out',
     login_title: 'Sign in', login_sub: 'Food waste registration & insight', email: 'Email', password: 'Password', sign_in: 'Sign in',
     demo_accounts: 'Demo accounts (password demo1234):',
     reg_title: 'Register waste', reg_restaurant: 'Restaurant',
@@ -39,17 +39,30 @@ const dict = {
     all_restaurants: 'All restaurants', city: 'City', latitude: 'Latitude', longitude: 'Longitude', public_impact: 'Public impact page',
     role: 'Role', restaurants: 'Restaurants', language: 'Language', last_login: 'Last login', new_password: 'New password',
     role_super_admin: 'Super Admin', role_org_admin: 'Organization Admin', role_restaurant_manager: 'Restaurant Manager', role_employee: 'Employee / Student',
-    baseline_kg: 'Baseline (kg / month)', target_kg: 'Target (kg / month)', start_date: 'Start date', end_date: 'End date', whole_org: 'Whole organization',
+    baseline_kg: 'Baseline (kg per period)', target_kg: 'Target (kg per period)', start_date: 'Start date', end_date: 'End date', whole_org: 'Whole organization',
     default_value: 'Default value per kg (valuation level 1)', currency: 'Currency', weather_enabled: 'Store weather data',
     action: 'Action', entity: 'Item', when: 'When', org_saved: 'Organization saved',
     profile_title: 'Profile', current_password: 'Current password', change_password: 'Change password', saved: 'Saved',
     loc_kitchen: 'Kitchen', loc_storage: 'Storage', loc_buffet: 'Buffet', loc_service: 'Service', loc_bar: 'Bar', loc_pastry: 'Pastry',
     mom_breakfast: 'Breakfast', mom_lunch: 'Lunch', mom_dinner: 'Dinner', mom_event: 'Event', mom_prep: 'Prep', mom_closing: 'Closing',
     weather_sync: 'Fetch weather', trend_guest: 'Waste per guest per week (g)', reg_w_estimate: 'Estimated by AI from the photo. Check it and correct it if needed.', reg_w_scale: 'Read from the scale by AI. Quick check.', badge_estimate: 'estimated', est_note: '{p}% of the kilos were estimated by AI, not weighed.', g_per_guest: 'g / guest', restaurants_count: 'Restaurants', create_org: 'New organization',
+    print: 'Print', export_xlsx: 'Export to Excel', exporting: 'Preparing the Excel file…', export_ready: 'Excel file downloaded', export_none: 'Nothing to export for this selection.',
+    gal_sub: 'Waste with a photo: see where the impact is.', gal_sort: 'Sort by', sort_heaviest: 'Heaviest first', sort_lightest: 'Lightest first', sort_category: 'Category', sort_newest: 'Newest first',
+    select_all: 'Select all', delete_selected: 'Delete selected', confirm_delete_n: 'Delete {n} registration(s)? They disappear from all lists, totals and dashboards.', deleted_n: '{n} deleted', deleted_some: '{n} of {m} deleted. You may only delete your own registrations of today.', confirm_delete_one: 'Delete this registration? It disappears from all lists, totals and dashboards.',
+    co2_title: 'How CO₂-eq is calculated', co2_method: 'CO₂-equivalent = weight of the waste × the emission factor of its category. Prices play no role.', co2_example: 'Example: 2 kg {cat} × {f} = {r} kg CO₂-eq.',
+    co2_factor: 'kg CO₂-eq per kg', co2_source: 'Source', co2_open_source: 'Open source', co2_hint: 'Click for the calculation and source', co2_this: 'This registration: {w} × {f} kg CO₂-eq/kg = {r}',
+    co2_caveat: 'Category factors are averages over different products, so the result is an indication, not a measurement.',
+    period_label: 'Period', period_week: 'Week', period_month: 'Month', period_year: 'Year', per_week: 'per week', per_month: 'per month', per_year: 'per year',
+    win_week: 'Last 7 days', win_month: 'Last 30 days', win_year: 'Last 365 days', target_help: 'Baseline = how much waste there was before you started, in kg per chosen period. The dashboard compares the last 7, 30 or 365 days with the baseline and the target.',
+    set_export: 'Data export', export_title: 'Export all data to Excel', export_sub: 'One Excel file with every registration, guest counts, dashboard summaries, products, suppliers, dishes and targets. Leave the dates empty for everything.',
+    sh_summary: 'Summary', sh_records: 'Records', sh_weekly: 'Per week', sh_guests: 'Guests per day', sh_targets: 'Targets',
+    time: 'Time', weight_source: 'Weight source', ws_manual: 'weighed', ws_scale: 'scale (AI read)', ws_estimate: 'estimated (AI)', unit_cost: 'Price / kg', potential_sales: 'Potential sales value',
+    co2_kg: 'CO₂-eq (kg)', has_photo: 'Photo', ai_accepted: 'AI suggestion accepted', yes: 'yes', no: 'no', generated: 'Generated', scope: 'Selection', filters_label: 'Filters',
+    lang_switch: 'Language', printed: 'Printed', co2_short: 'Calculation & source',
   },
   nl: {
     demo_banner: 'DEMO DATA: fictieve gegevens voor demonstratie',
-    nav_register: 'Registreren', nav_records: 'Registraties', nav_gallery: 'Galerij', gal_title: 'Fotogalerij', gal_sub: 'Grootste gewichten bovenaan: zie waar de impact zit.', gal_7: 'Laatste 7 dagen', gal_all: 'Alles', gal_more: 'Meer tonen', gal_photos: "foto's", gal_empty: "Nog geen foto's in deze selectie. Foto's verschijnen hier zodra waste met een foto wordt geregistreerd.", nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen',
+    nav_register: 'Registreren', nav_records: 'Registraties', nav_gallery: 'Galerij', gal_title: 'Fotogalerij', gal_7: 'Laatste 7 dagen', gal_all: 'Alles', gal_more: 'Meer tonen', gal_photos: "foto's", gal_empty: "Nog geen foto's in deze selectie. Foto's verschijnen hier zodra waste met een foto wordt geregistreerd.", nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen',
     login_title: 'Inloggen', login_sub: 'Voedselverspilling registreren en verbeteren', email: 'E-mail', password: 'Wachtwoord', sign_in: 'Inloggen',
     demo_accounts: 'Demo-accounts (wachtwoord demo1234):',
     reg_title: 'Waste registreren', reg_restaurant: 'Restaurant',
@@ -83,17 +96,31 @@ const dict = {
     all_restaurants: 'Alle restaurants', city: 'Plaats', latitude: 'Breedtegraad', longitude: 'Lengtegraad', public_impact: 'Publieke impactpagina',
     role: 'Rol', restaurants: 'Restaurants', language: 'Taal', last_login: 'Laatst ingelogd', new_password: 'Nieuw wachtwoord',
     role_super_admin: 'Super Admin', role_org_admin: 'Organisatiebeheerder', role_restaurant_manager: 'Restaurantmanager', role_employee: 'Medewerker / Student',
-    baseline_kg: 'Nulmeting (kg / maand)', target_kg: 'Doel (kg / maand)', start_date: 'Startdatum', end_date: 'Einddatum', whole_org: 'Hele organisatie',
+    baseline_kg: 'Nulmeting (kg per periode)', target_kg: 'Doel (kg per periode)', start_date: 'Startdatum', end_date: 'Einddatum', whole_org: 'Hele organisatie',
     default_value: 'Standaardwaarde per kg (waarderingsniveau 1)', currency: 'Valuta', weather_enabled: 'Weerdata opslaan',
     action: 'Actie', entity: 'Item', when: 'Wanneer', org_saved: 'Organisatie opgeslagen',
     profile_title: 'Profiel', current_password: 'Huidig wachtwoord', change_password: 'Wachtwoord wijzigen', saved: 'Opgeslagen',
     loc_kitchen: 'Keuken', loc_storage: 'Opslag', loc_buffet: 'Buffet', loc_service: 'Bediening', loc_bar: 'Bar', loc_pastry: 'Patisserie',
     mom_breakfast: 'Ontbijt', mom_lunch: 'Lunch', mom_dinner: 'Diner', mom_event: 'Evenement', mom_prep: 'Mise en place', mom_closing: 'Afsluiten',
     weather_sync: 'Weer ophalen', trend_guest: 'Waste per gast per week (g)', reg_w_estimate: 'Geschat door AI op basis van de foto. Controleer en pas aan als het niet klopt.', reg_w_scale: 'Afgelezen van de weegschaal door AI. Even controleren.', badge_estimate: 'geschat', est_note: '{p}% van de kilo\'s is door AI geschat en niet gewogen.', g_per_guest: 'g / gast', restaurants_count: 'Restaurants', create_org: 'Nieuwe organisatie',
+    print: 'Printen', export_xlsx: 'Exporteren naar Excel', exporting: 'Excel-bestand wordt gemaakt…', export_ready: 'Excel-bestand gedownload', export_none: 'Niets te exporteren voor deze selectie.',
+    gal_sub: 'Waste met een foto: zie waar de impact zit.', gal_sort: 'Sorteren op', sort_heaviest: 'Zwaarste eerst', sort_lightest: 'Lichtste eerst', sort_category: 'Categorie', sort_newest: 'Nieuwste eerst',
+    select_all: 'Alles selecteren', delete_selected: 'Selectie verwijderen', confirm_delete_n: '{n} registratie(s) verwijderen? Ze verdwijnen uit alle lijsten, totalen en dashboards.', deleted_n: '{n} verwijderd', deleted_some: '{n} van {m} verwijderd. Je mag alleen je eigen registraties van vandaag verwijderen.', confirm_delete_one: 'Deze registratie verwijderen? Hij verdwijnt uit alle lijsten, totalen en dashboards.',
+    co2_title: 'Zo wordt CO₂-eq berekend', co2_method: 'CO₂-equivalent = gewicht van de waste × de emissiefactor van de categorie. Prijzen spelen geen rol.', co2_example: 'Voorbeeld: 2 kg {cat} × {f} = {r} kg CO₂-eq.',
+    co2_factor: 'kg CO₂-eq per kg', co2_source: 'Bron', co2_open_source: 'Bron openen', co2_hint: 'Klik voor de berekening en de bron', co2_this: 'Deze registratie: {w} × {f} kg CO₂-eq/kg = {r}',
+    co2_caveat: 'Categoriefactoren zijn gemiddelden over verschillende producten. De uitkomst is dus een indicatie, geen meting.',
+    period_label: 'Periode', period_week: 'Week', period_month: 'Maand', period_year: 'Jaar', per_week: 'per week', per_month: 'per maand', per_year: 'per jaar',
+    win_week: 'Laatste 7 dagen', win_month: 'Laatste 30 dagen', win_year: 'Laatste 365 dagen', target_help: 'Nulmeting = hoeveel waste er was voordat je begon, in kg per gekozen periode. Het dashboard vergelijkt de laatste 7, 30 of 365 dagen met de nulmeting en het doel.',
+    set_export: 'Data-export', export_title: 'Alle data exporteren naar Excel', export_sub: 'Eén Excel-bestand met alle registraties, gasten, dashboardoverzichten, producten, leveranciers, gerechten en doelstellingen. Laat de datums leeg voor alles.',
+    sh_summary: 'Overzicht', sh_records: 'Registraties', sh_weekly: 'Per week', sh_guests: 'Gasten per dag', sh_targets: 'Doelstellingen',
+    time: 'Tijd', weight_source: 'Bron gewicht', ws_manual: 'gewogen', ws_scale: 'weegschaal (AI)', ws_estimate: 'geschat (AI)', unit_cost: 'Prijs / kg', potential_sales: 'Potentiële verkoopwaarde',
+    co2_kg: 'CO₂-eq (kg)', has_photo: 'Foto', ai_accepted: 'AI-voorstel overgenomen', yes: 'ja', no: 'nee', generated: 'Gemaakt op', scope: 'Selectie', filters_label: 'Filters',
+    lang_switch: 'Taal', printed: 'Geprint', co2_short: 'Berekening & bron',
   },
 };
 
-let current = localStorage.getItem('fw_lang') || 'nl';
+let current = localStorage.getItem('fw_lang') || 'en';
+document.documentElement.lang = current;
 
 export function setLang(l) { if (dict[l]) { current = l; localStorage.setItem('fw_lang', l); document.documentElement.lang = l; } }
 export function lang() { return current; }

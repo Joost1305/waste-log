@@ -27,7 +27,7 @@ begin
   perform app.create_login('admin@platform.demo', 'demo1234', 'Platform Admin (demo)', 'super_admin', null, '{}', 'en');
 
   insert into public.organizations (name, slug, default_value_per_kg, default_language, is_demo)
-  values ('Hotelschool The Hague (demo)', 'hotelschool-the-hague-demo', 6.50, 'nl', true) returning id into v_org;
+  values ('Hotelschool The Hague (demo)', 'hotelschool-the-hague-demo', 6.50, 'en', true) returning id into v_org;
 
   create temporary table _rest (key text, id bigint, name text, guests int, scale numeric) on commit drop;
   insert into _rest values ('ams', null, 'Amsterdam Restaurant', 140, 1.15), ('dh', null, 'The Hague Restaurant', 160, 1.25),

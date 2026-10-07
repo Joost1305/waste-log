@@ -1,4 +1,4 @@
-import { api, app, esc, toastError } from '../core.js';
+import { api, app, esc, toastError, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { SHOW_DEMO_LOGINS } from '../config.js';
 
@@ -10,7 +10,8 @@ export function renderLogin(onSuccess) {
     <div class="login-wrap">
       <form class="card login-card" id="login-form" autocomplete="on">
         <div class="logo"><img src="img/icon.svg" width="40" height="40" alt="">
-          <div><h1>${t('login_title')}</h1><div class="muted small">${t('login_sub')}</div></div></div>
+          <div style="flex:1"><h1>${t('login_title')}</h1><div class="muted small">${t('login_sub')}</div></div>
+          <div class="lang-toggle" id="login-lang" role="group" aria-label="Language"></div></div>
         <div class="field"><label>${t('email')}</label><input type="email" name="email" autocomplete="username" required></div>
         <div class="field"><label>${t('password')}</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="btn-primary btn-xl" type="submit">${t('sign_in')}</button>
@@ -19,6 +20,7 @@ export function renderLogin(onSuccess) {
       </form>
     </div>`;
   const form = document.getElementById('login-form');
+  renderLangToggle(document.getElementById('login-lang'));
   form.querySelector('.demo-accounts').hidden = !SHOW_DEMO_LOGINS;
   form.querySelectorAll('[data-demo]').forEach((b) => (b.onclick = () => {
     form.email.value = b.dataset.demo; form.password.value = 'demo1234'; form.requestSubmit();

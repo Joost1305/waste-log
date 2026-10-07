@@ -169,3 +169,58 @@ test('gallery: heaviest photos first, only within scope', async () => {
   const b = await as(db, U['admin@bistro'], async ({ one }) => (await one('select gallery() g')).g);
   assert.equal(b.total, 0);
 });
+
+test('gallery sorting: lightest first, by category, and invalid sort falls back to heaviest', async () => {
+  const light = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select gallery(p_sort => 'lightest') g`)).g);
+  const lw = light.rows.map((r) => Number(r.weight_kg));
+  assert.deepEqual(lw, [...lw].sort((a, b) => a - b));
+  const cat = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select gallery(p_sort => 'category', p_limit => 100) g`)).g);
+  const order = cat.rows.map((r) => r.waste_category_id);
+  const seen = []; for (const c of order) if (seen[seen.length - 1] !== c) seen.push(c);
+  assert.equal(new Set(seen).size, seen.length);            // each category forms one block
+  assert.ok(cat.rows[0].user_id && cat.rows[0].created_at);  // needed for delete rights in the app
+  const bad = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select gallery(p_sort => 'x; drop') g`)).g);
+  assert.equal(bad.sort, 'heaviest');
+});
+
+test('export: records and guests within scope only', async () => {
+  const e = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select export_data() e')).e);
+  const n = (await db.query('select count(*)::int n from waste_records where organization_id = $1 and deleted_at is null', [ID.hth])).rows[0].n;
+  assert.equal(e.records.length, n);
+  assert.ok(e.records[0].recorded_local && 'co2e_per_kg' in e.records[0]);
+  assert.ok(e.covers.length > 0);
+  const m = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select export_data() e')).e);
+  assert.ok(m.records.every((r) => ['Amsterdam Restaurant', 'Brasserie ZINQ'].includes(r.restaurant)));
+  const s = await as(db, U['student@hth'], async ({ one }) => (await one('select export_data() e')).e);
+  assert.ok(s.records.every((r) => r.user === 'Noah Bakker (demo)'));
+  const b = await as(db, U['admin@bistro'], async ({ one }) => (await one('select export_data() e')).e);
+  assert.ok(!b.records.some((r) => r.restaurant === 'Amsterdam Restaurant'));
+});
+
+test('targets: period week/month/year, editable by org admins only, dashboard uses the period window', async () => {
+  const tg = (await db.query(`select id from targets where organization_id = $1 and deleted_at is null limit 1`, [ID.hth])).rows[0];
+  await as(db, U['orgadmin@hth'], ({ q }) => q(`update targets set period = 'week', baseline_kg = 200, target_kg = 150 where id = $1`, [tg.id]));
+  const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select dashboard() d')).d);
+  assert.equal(d.target.period, 'week');
+  assert.equal(d.target.window.days, 7);
+  assert.equal(Number(d.target.baseline_kg), 200);
+  await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`update targets set period = 'decade' where id = $1`, [tg.id])));
+  const m = await as(db, U['manager.amsterdam@hth'], async ({ q }) => q(`update targets set baseline_kg = 999 where id = $1 returning id`, [tg.id]));
+  assert.equal(m.length, 0);
+});
+
+test('bulk delete: managers soft-delete several records, employees only their own of today', async () => {
+  const ids = (await db.query(`select id from waste_records where organization_id = $1 and restaurant_id = $2 and deleted_at is null order by id limit 3`, [ID.hth, ID.ams])).rows.map((r) => r.id);
+  const del = await as(db, U['manager.amsterdam@hth'], async ({ q }) => q(`update waste_records set deleted_at = now() where id = any($1) returning id`, [ids]));
+  assert.equal(del.length, 3);
+  const other = (await db.query(`select id from waste_records where organization_id = $1 and deleted_at is null and user_id <> $2 limit 2`, [ID.hth, U['student@hth']])).rows.map((r) => r.id);
+  const s = await as(db, U['student@hth'], async ({ q }) => q(`update waste_records set deleted_at = now() where id = any($1) returning id`, [other]));
+  assert.equal(s.length, 0);
+});
+
+test('CO2 factors carry a source and English is the default language', async () => {
+  const c = await as(db, U['student@hth'], async ({ q }) => q(`select co2e_per_kg, co2e_source, co2e_source_url from waste_categories where organization_id is null`));
+  assert.ok(c.length > 0 && c.every((r) => r.co2e_source && r.co2e_source_url));
+  const lang = (await db.query(`select column_default from information_schema.columns where table_name = 'users' and column_name = 'language'`)).rows[0];
+  assert.match(lang.column_default, /'en'/);
+});

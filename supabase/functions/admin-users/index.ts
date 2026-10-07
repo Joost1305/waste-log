@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'create') {
-    const { name, email, role, password, language = 'nl', is_active = true } = body;
+    const { name, email, role, password, language = 'en', is_active = true } = body;
     if (!orgId && role !== 'super_admin') return fail(400, 'No organization');
     if (typeof name !== 'string' || !name.trim() || name.length > 120) return fail(400, 'Name is required');
     if (typeof email !== 'string' || !EMAIL.test(email)) return fail(400, 'Valid email is required');

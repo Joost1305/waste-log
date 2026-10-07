@@ -1,5 +1,5 @@
 // Shared helpers: API client, app state, formatting, DOM, toast, modal, forms.
-import { t, lang } from './i18n.js';
+import { t, lang, setLang, LANGS } from './i18n.js';
 
 export const state = { user: null, meta: null, orgId: Number(localStorage.getItem('fw_org')) || null };
 
@@ -101,6 +101,7 @@ export function formHtml(fields, values = {}) {
   return fields.map((f) => {
     const v = values[f.name];
     const req = f.required ? 'required' : '';
+    if (f.type === 'help') return `<div class="note" style="margin:0 0 14px">${esc(f.label)}</div>`;
     if (f.type === 'checkbox') {
       return `<div class="field"><label class="check"><input type="checkbox" name="${f.name}" ${v ? 'checked' : ''}> ${esc(f.label)}</label></div>`;
     }
@@ -139,3 +140,39 @@ export function readForm(root, fields) {
 }
 
 export const labelOf = (list, id) => { const x = (list || []).find((i) => i.id === id); return x ? (x.label || x.name) : ''; };
+
+// ------------------------------------------------------------------ language switch
+// EN | NL switch. Saved to the user's profile when signed in, otherwise only in this browser.
+export function renderLangToggle(el) {
+  el.innerHTML = Object.keys(LANGS).map((l) =>
+    `<button type="button" data-lang="${l}" class="${l === lang() ? 'on' : ''}" aria-pressed="${l === lang()}" title="${esc(LANGS[l])}">${l.toUpperCase()}</button>`).join('');
+  el.querySelectorAll('[data-lang]').forEach((b) => (b.onclick = async () => {
+    const l = b.dataset.lang;
+    if (l === lang()) return;
+    setLang(l);
+    if (state.user) {
+      try { const res = await api('/auth/me', { method: 'PATCH', body: { language: l } }); state.user = res.data.user || { ...state.user, language: l }; }
+      catch (e) { toastError(e); }
+    }
+    window.dispatchEvent(new Event('fw:lang'));
+  }));
+}
+
+
+// ------------------------------------------------------------------ print
+// A header that only appears on paper: organization, page title, selection and print date.
+export function printHeader(title, selection) {
+  const org = (state.meta && state.meta.organization && state.meta.organization.name) || '';
+  return `<div class="print-only print-head"><div><strong>WASTE log</strong> · ${esc(org)}</div>
+    <div class="print-title">${esc(title)}</div>${selection ? `<div>${esc(selection)}</div>` : ''}
+    <div class="small">${t('printed')}: ${fmt.dateTime(new Date().toISOString())}</div></div>`;
+}
+export function printPage() { window.print(); }
+
+// Charts are drawn on canvas at screen size; redraw them at paper size before printing and back after.
+function resizeCharts() {
+  if (!window.Chart) return;
+  Object.values(window.Chart.instances || {}).forEach((c) => { try { c.resize(); } catch { /* chart gone */ } });
+}
+window.addEventListener('beforeprint', resizeCharts);
+window.addEventListener('afterprint', resizeCharts);

@@ -15,7 +15,7 @@ export class ApiError extends Error {
   }
 }
 
-const ctx = { orgId: null, lang: 'nl', profile: null };
+const ctx = { orgId: null, lang: 'en', profile: null };
 export function setContext(c) { Object.assign(ctx, c); }
 
 function check(res, notFoundIfEmpty = false) {
@@ -128,7 +128,7 @@ const catalog = {
   suppliers: { table: 'suppliers', select: '*', fields: ['name', 'contact'] },
   products: { table: 'products', select: '*, suppliers(name)', fields: ['name', 'waste_category_id', 'category_id', 'default_supplier_id', 'purchase_price_per_kg', 'sales_price_per_kg', 'is_quick_pick', 'is_active'] },
   'menu-items': { table: 'menu_items', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'portion_size_g', 'sales_price', 'cost_price', 'is_active'] },
-  targets: { table: 'targets', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'baseline_kg', 'target_kg', 'start_date', 'end_date'] },
+  targets: { table: 'targets', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'period', 'baseline_kg', 'target_kg', 'start_date', 'end_date'] },
 };
 const flat = (r) => ({ ...r, supplier_name: r.suppliers?.name, restaurant_name: r.restaurants?.name });
 for (const [path, c] of Object.entries(catalog)) {
@@ -182,6 +182,14 @@ route('POST', '/waste', async ({ body }) => {
 route('PATCH', '/waste/:id', async ({ p, body }) =>
   check(await sb.from('waste_records').update(wasteRow(body)).eq('id', p.id).select('id'), true)[0]);
 route('DELETE', '/waste/:id', async ({ p }) => softDelete('waste_records', p.id));
+// Delete several at once. Row Level Security decides which ones the user may delete;
+// the answer says how many were actually deleted.
+route('POST', '/waste/delete', async ({ body }) => {
+  const ids = [...new Set((body.ids || []).map(Number).filter((x) => Number.isInteger(x) && x > 0))].slice(0, 500);
+  if (!ids.length) return { deleted: 0, requested: 0 };
+  const rows = check(await sb.from('waste_records').update({ deleted_at: new Date().toISOString() }).in('id', ids).is('deleted_at', null).select('id'));
+  return { deleted: rows.length, requested: ids.length };
+});
 
 // photos: upload straight to private storage, AI via edge function
 route('POST', '/waste/photo', async ({ form }) => {
@@ -199,8 +207,23 @@ route('GET', '/gallery', async ({ query }) => {
   const res = check(await sb.rpc('gallery', {
     p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
     p_category: num(query.waste_category_id), p_limit: num(query.limit) || 24, p_offset: num(query.offset) || 0, p_lang: ctx.lang,
+    p_sort: query.sort || 'heaviest',
   }));
   return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
+});
+
+// export: every record (flat) and guest counts for a period, for Excel
+route('GET', '/export', async ({ query }) => check(await sb.rpc('export_data', {
+  p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
+  p_category: num(query.waste_category_id), p_reason: num(query.reason_id), p_mine: query.mine === '1', p_lang: ctx.lang,
+})));
+
+// CO2 factors and where they come from
+route('GET', '/co2-factors', async () => {
+  const rows = check(await sb.from('waste_categories').select('id, code, labels, co2e_per_kg, co2e_source, co2e_source_url, color, sort_order, organization_id')
+    .eq('is_active', true).order('sort_order'));
+  return rows.filter((r) => r.organization_id === null || r.organization_id === ctx.orgId)
+    .map((r) => ({ ...r, label: r.labels?.[ctx.lang] || r.labels?.en || r.code }));
 });
 
 // dashboard
