@@ -3,6 +3,7 @@
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, loadMeta, labelOf } from '../core.js';
 import { t, LANGS } from '../i18n.js';
 import { exportAll } from '../export.js';
+import { openProductImport } from '../product-import.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
 
@@ -15,6 +16,7 @@ function sections() {
   return [
     p.catalog && {
       key: 'products', title: t('set_products'), endpoint: '/products', canEdit: true, reloadMeta: true,
+      headerActions: [{ label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
       columns: [
         [t('name'), (r) => `${esc(r.name)} ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}`],
         [t('category'), (r) => esc(labelOf(meta.waste_categories, r.waste_category_id))],
@@ -148,7 +150,8 @@ async function crud(el, cfg) {
   const canCreate = cfg.canCreate !== false;
   const canDelete = cfg.canDelete !== false;
   el.innerHTML = `<div class="card"><div class="page-head" style="margin-bottom:12px"><h2 style="margin:0">${cfg.title}</h2>
-    ${canCreate ? `<button class="btn-primary btn-sm" id="crud-add">+ ${t('add')}</button>` : ''}</div><div id="crud-list"><span class="spinner"></span></div></div>`;
+    <div class="page-actions">${(cfg.headerActions || []).map((a, i) => `<button class="btn-sm" data-hact="${i}">${a.label}</button>`).join('')}
+    ${canCreate ? `<button class="btn-primary btn-sm" id="crud-add">+ ${t('add')}</button>` : ''}</div></div><div id="crud-list"><span class="spinner"></span></div></div>`;
   let rows = [];
   const load = async () => {
     try { rows = (await api(cfg.endpoint)).data; } catch (e) { toastError(e); return; }
@@ -188,6 +191,7 @@ async function crud(el, cfg) {
       };
     });
   };
+  $$('[data-hact]', el).forEach((b) => (b.onclick = () => cfg.headerActions[Number(b.dataset.hact)].run(() => load())));
   const add = $('#crud-add');
   if (add) add.onclick = () => openForm(null);
   load();

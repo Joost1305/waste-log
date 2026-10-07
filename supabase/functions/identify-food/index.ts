@@ -10,7 +10,7 @@ import { admin, caller, cors, fail, json } from '../_shared/common.ts';
 const env = () => ({ KEY: Deno.env.get('ANTHROPIC_API_KEY') || '', MODEL: Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5' });
 
 function norm(s: string) {
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
 }
 
 function matchProduct(name: string, products: { id: number; name: string; waste_category_id: number }[]) {
@@ -54,14 +54,15 @@ Deno.serve(async (req) => {
 
   const [{ data: cats }, { data: prods }] = await Promise.all([
     sb.from('waste_categories').select('id, code').or(`organization_id.is.null,organization_id.eq.${me.organization_id}`).eq('is_active', true),
-    sb.from('products').select('id, name, waste_category_id').eq('organization_id', me.organization_id).eq('is_active', true).is('deleted_at', null),
+    sb.from('products').select('id, name, waste_category_id').eq('organization_id', me.organization_id).eq('is_active', true).is('deleted_at', null)
+      .order('is_quick_pick', { ascending: false }).order('name').limit(1000),
   ]);
   const categories = cats || []; const products = prods || [];
 
   const prompt = [
     'You help a professional kitchen register food waste. Look at the photo and identify the main food that is being thrown away.',
     `Choose category_code from exactly this list: ${categories.map((c) => c.code).join(', ')}.`,
-    `If it clearly matches one of the kitchen's own products, use that product name: ${products.slice(0, 80).map((p) => p.name).join('; ')}.`,
+    `If it clearly matches one of the kitchen's own products, use that product name: ${products.slice(0, 250).map((p) => p.name).join('; ')}.`,
     'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
     'Otherwise estimate the weight of the wasted food in kg from its size, the container and any reference objects, and set weight_source to "estimate".',
     'Only use null for suggested_weight_kg if there is no visible food at all.',

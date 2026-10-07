@@ -158,6 +158,39 @@ for (const [path, c] of Object.entries(catalog)) {
   route('DELETE', `/${path}/:id`, async ({ p }) => softDelete(c.table, p.id));
 }
 
+// Product import from Excel: create missing suppliers, add new products, optionally update existing ones.
+route('POST', '/products/import', async ({ body }) => {
+  const norm = (x) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+  const rows = (body.rows || []).filter((r) => r.name && String(r.name).trim()).slice(0, 5000);
+  const price = (v) => (v == null || !Number.isFinite(Number(v)) || Number(v) < 0 ? null : Math.round(Number(v) * 100) / 100);
+  const products = check(await sb.from('products').select('id, name').eq('organization_id', ctx.orgId).is('deleted_at', null));
+  let suppliers = check(await sb.from('suppliers').select('id, name').eq('organization_id', ctx.orgId).is('deleted_at', null));
+  const supNames = [...new Map(rows.filter((r) => r.supplier).map((r) => [norm(r.supplier), String(r.supplier).trim()])).entries()]
+    .filter(([k]) => !suppliers.some((s) => norm(s.name) === k)).map(([, v]) => v);
+  if (supNames.length) {
+    const made = check(await sb.from('suppliers').insert(supNames.map((name) => ({ name, organization_id: ctx.orgId }))).select('id, name'));
+    suppliers = suppliers.concat(made);
+  }
+  const supId = (n) => (n ? (suppliers.find((s) => norm(s.name) === norm(n)) || {}).id ?? null : null);
+  const byName = new Map(products.map((p) => [norm(p.name), p.id]));
+  const fresh = []; const updates = [];
+  for (const r of rows) {
+    const row = { name: String(r.name).trim().slice(0, 200), waste_category_id: Number(r.waste_category_id),
+      purchase_price_per_kg: price(r.purchase_price_per_kg), sales_price_per_kg: price(r.sales_price_per_kg), default_supplier_id: supId(r.supplier) };
+    const id = byName.get(norm(row.name));
+    if (id) { if (body.update) updates.push({ id, row }); } else { fresh.push({ ...row, organization_id: ctx.orgId, is_active: true }); byName.set(norm(row.name), -1); }
+  }
+  for (let i = 0; i < fresh.length; i += 200) check(await sb.from('products').insert(fresh.slice(i, i + 200)).select('id'));
+  for (const u of updates) {
+    const patch = { waste_category_id: u.row.waste_category_id };
+    if (u.row.purchase_price_per_kg != null) patch.purchase_price_per_kg = u.row.purchase_price_per_kg;
+    if (u.row.sales_price_per_kg != null) patch.sales_price_per_kg = u.row.sales_price_per_kg;
+    if (u.row.default_supplier_id) patch.default_supplier_id = u.row.default_supplier_id;
+    check(await sb.from('products').update(patch).eq('id', u.id).select('id'));
+  }
+  return { created: fresh.length, updated: updates.length, suppliers_created: supNames.length };
+});
+
 // guests per day
 route('GET', '/covers', async ({ query }) => {
   let q = sb.from('daily_covers').select('id, restaurant_id, date, guests, restaurants(name)').eq('organization_id', ctx.orgId).order('date', { ascending: false }).limit(60);
