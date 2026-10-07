@@ -27,6 +27,8 @@
   <div id="modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true"></div>
   </div>
+  <!-- Keep the sign-in link details (invitation / password reset) before the auth library reads and clears them -->
+  <script>window.__authHash = location.hash;</script>
   <script src="vendor/chart.umd.js"></script>
   <script src="vendor/supabase.js"></script>
   <script type="module" src="js/app.js"></script>

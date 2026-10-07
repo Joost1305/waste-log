@@ -95,18 +95,28 @@ function sections() {
     p.users && {
       key: 'users', title: t('set_users'), endpoint: '/users', canEdit: true,
       columns: [
-        [t('name'), (r) => `${esc(r.name)}${r.is_active ? '' : ' <span class="badge">inactive</span>'}`], [t('email'), (r) => esc(r.email)],
+        [t('name'), (r) => `${esc(r.name)}${r.is_active ? '' : ' <span class="badge">inactive</span>'}${r.invite_pending ? ` <span class="badge warn">${t('invite_pending')}</span>` : ''}`], [t('email'), (r) => esc(r.email)],
         [t('role'), (r) => t('role_' + r.role)],
         [t('restaurants'), (r) => (['org_admin', 'super_admin'].includes(r.role) ? t('all_restaurants') : r.restaurant_ids.map((id) => esc(labelOf(meta.restaurants, id))).join(', '))],
         [t('last_login'), (r) => fmt.dateTime(r.last_login_at)],
       ],
+      rowActions: [{ label: t('send_reset'), show: (r) => r.id !== state.user.id && r.is_active, run: async (r) => {
+        if (!(await confirmDialog(t('confirm_reset', { e: r.email }), t('send'), false))) return;
+        try { await api(`/users/${r.id}/send-reset`, { method: 'POST' }); toast(t('reset_sent', { e: r.email })); } catch (e) { toastError(e); }
+      } }],
+      validate: (body, row) => {
+        if (!row && !body.invite && !(body.password && body.password.length >= 8)) return t('pw_needed');
+        return null;
+      },
+      afterCreate: (body) => { if (body.invite) toast(t('invite_sent', { e: body.email })); },
       fields: (row) => [
         { name: 'name', label: t('name'), required: true },
         { name: 'email', label: t('email'), type: 'email', required: true },
         { name: 'role', label: t('role'), type: 'select', blank: false, numericValue: false, options: roles.map((r) => ({ value: r, label: t('role_' + r) })) },
         { name: 'restaurant_ids', label: t('restaurants'), type: 'multiselect', options: restOpts() },
         { name: 'language', label: t('language'), type: 'select', blank: false, numericValue: false, options: Object.entries(LANGS).map(([v, l]) => ({ value: v, label: l })) },
-        { name: 'password', label: row ? `${t('new_password')} (min. 8)` : `${t('password')} (min. 8)`, type: 'password', required: !row, emptyAsUndefined: true },
+        ...(row ? [] : [{ name: 'invite', label: t('invite_email'), type: 'checkbox', default: true }]),
+        { name: 'password', label: row ? `${t('new_password')} (${t('pw_optional')})` : `${t('password')} (min. 8)`, type: 'password', emptyAsUndefined: true },
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
     },
@@ -145,10 +155,13 @@ async function crud(el, cfg) {
     $('#crud-list').innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr>
       ${cfg.columns.map((c) => `<th class="${c[2] ? 'right' : ''}">${c[0]}</th>`).join('')}<th></th></tr></thead><tbody>
       ${rows.map((r) => `<tr>${cfg.columns.map((c) => `<td class="${c[2] ? 'right num' : ''}">${c[1](r) ?? ''}</td>`).join('')}
-        <td class="actions">${cfg.canEdit ? `<button class="btn-sm" data-edit="${r.id}">${t('edit')}</button>` : ''}
+        <td class="actions">${(cfg.rowActions || []).map((a, i) => (a.show(r) ? `<button class="btn-sm btn-ghost" data-act="${i}" data-id="${r.id}">${a.label}</button>` : '')).join('')}
+        ${cfg.canEdit ? `<button class="btn-sm" data-edit="${r.id}">${t('edit')}</button>` : ''}
         ${canDelete && r.id !== state.user.id ? `<button class="btn-sm btn-ghost btn-danger" data-del="${r.id}">${t('delete')}</button>` : ''}</td></tr>`).join('')}
       </tbody></table></div>` : `<div class="empty">${t('no_data')}</div>`;
-    $$('[data-edit]', el).forEach((b) => (b.onclick = () => openForm(rows.find((r) => r.id === Number(b.dataset.edit)))));
+    const byId = (id) => rows.find((r) => String(r.id) === String(id));
+    $$('[data-edit]', el).forEach((b) => (b.onclick = () => openForm(byId(b.dataset.edit))));
+    $$('[data-act]', el).forEach((b) => (b.onclick = () => cfg.rowActions[Number(b.dataset.act)].run(byId(b.dataset.id))));
     $$('[data-del]', el).forEach((b) => (b.onclick = async () => {
       if (!(await confirmDialog(t('confirm_delete')))) return;
       try { await api(`${cfg.endpoint}/${b.dataset.del}`, { method: 'DELETE' }); await after(); } catch (e) { toastError(e); }
@@ -165,9 +178,11 @@ async function crud(el, cfg) {
       card.querySelector('#crud-form').onsubmit = async (e) => {
         e.preventDefault();
         const body = readForm(card, fields);
+        const invalid = cfg.validate && cfg.validate(body, row);
+        if (invalid) { toast(invalid, 'error'); return; }
         try {
           if (row) await api(`${cfg.endpoint}/${row.id}`, { method: 'PATCH', body });
-          else await api(cfg.endpoint, { method: cfg.createMethod || 'POST', body });
+          else { await api(cfg.endpoint, { method: cfg.createMethod || 'POST', body }); if (cfg.afterCreate) cfg.afterCreate(body); }
           close(); toast(t('saved')); await after();
         } catch (err) { toastError(err); }
       };

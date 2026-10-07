@@ -9,6 +9,7 @@ import { renderGallery } from './pages/gallery.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderSettings } from './pages/settings.js';
 import { renderProfile } from './pages/profile.js';
+import { renderSetPassword } from './pages/set-password.js';
 
 const routes = [
   { path: 'register', render: renderRegister, nav: 'nav_register', show: () => true },
@@ -69,7 +70,24 @@ async function renderShell() {
   } else sw.hidden = true;
 }
 
+// Arriving from an invitation or password-reset email: the link carries the sign-in in the URL.
+// The auth library signs the person in; we then ask them to choose a password.
+const authLink = (() => {
+  const h = new URLSearchParams(String(window.__authHash || '').replace(/^#/, ''));
+  if (h.get('error_description')) return { error: h.get('error_description') };
+  return ['invite', 'recovery', 'signup', 'magiclink'].includes(h.get('type')) ? { type: h.get('type') } : null;
+})();
+
 async function route() {
+  if (authLink && !authLink.handled) {
+    authLink.handled = true;
+    if (authLink.error) { location.hash = '#/login'; setTimeout(() => toastError(new Error(authLink.error)), 300); return; }
+    if (await ensureSession()) {
+      await renderShell();
+      return renderSetPassword(() => { location.hash = `#/${homePath()}`; });
+    }
+    location.hash = '#/login'; return;
+  }
   const [path, ...rest] = location.hash.replace(/^#\//, '').split('/');
   if (path === 'logout') {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});

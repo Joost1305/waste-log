@@ -66,6 +66,13 @@ route('POST', '/auth/login', async ({ body }) => {
 });
 route('POST', '/auth/logout', async () => { await sb.auth.signOut(); return { signedOut: true }; });
 route('GET', '/auth/me', async () => ({ user: await profile() }));
+// Set a new password after following an invitation or reset link (the link itself signed the person in).
+route('PATCH', '/auth/password', async ({ body }) => {
+  if (!body.password || String(body.password).length < 8) throw new ApiError(400, 'Password must be at least 8 characters');
+  const { error } = await sb.auth.updateUser({ password: body.password });
+  if (error) throw new ApiError(400, error.message);
+  return { user: await profile() };
+});
 route('PATCH', '/auth/me', async ({ body }) => {
   if (body.new_password) {
     const p = ctx.profile || await profile();
@@ -109,9 +116,17 @@ route('DELETE', '/restaurants/:id', async ({ p }) => softDelete('restaurants', p
 route('GET', '/users', async () => {
   const users = check(await sb.from('users').select('id, name, email, role, language, is_active, organization_id').eq('organization_id', ctx.orgId).is('deleted_at', null).order('name'));
   const links = check(await sb.from('user_restaurants').select('user_id, restaurant_id').in('user_id', users.map((u) => u.id)));
-  return users.map((u) => ({ ...u, last_login_at: null, restaurant_ids: links.filter((l) => l.user_id === u.id).map((l) => l.restaurant_id) }));
+  // Last login and invitation status come from Supabase Auth (org admins only; others get an empty list)
+  const logins = (await sb.rpc('user_logins', { p_org: ctx.orgId })).data || [];
+  return users.map((u) => {
+    const l = logins.find((x) => x.id === u.id) || {};
+    return { ...u, last_login_at: l.last_sign_in_at || null, invite_pending: Boolean(l.invited_at && !l.last_sign_in_at),
+      restaurant_ids: links.filter((x) => x.user_id === u.id).map((x) => x.restaurant_id) };
+  });
 });
-route('POST', '/users', async ({ body }) => invoke('admin-users', { action: 'create', organization_id: ctx.orgId, ...body }));
+const appUrl = () => `${location.origin}${location.pathname}`;
+route('POST', '/users', async ({ body }) => invoke('admin-users', { action: 'create', organization_id: ctx.orgId, redirect_to: appUrl(), ...body }));
+route('POST', '/users/:id/send-reset', async ({ p }) => invoke('admin-users', { action: 'send_reset', organization_id: ctx.orgId, id: p.id, redirect_to: appUrl() }));
 route('PATCH', '/users/:id', async ({ p, body }) => invoke('admin-users', { action: 'update', organization_id: ctx.orgId, id: p.id, ...body }));
 route('DELETE', '/users/:id', async ({ p }) => invoke('admin-users', { action: 'delete', organization_id: ctx.orgId, id: p.id }));
 

@@ -224,3 +224,14 @@ test('CO2 factors carry a source and English is the default language', async () 
   const lang = (await db.query(`select column_default from information_schema.columns where table_name = 'users' and column_name = 'language'`)).rows[0];
   assert.match(lang.column_default, /'en'/);
 });
+
+test('user logins: org admins see last login of their own organization only', async () => {
+  await db.query(`update auth.users set last_sign_in_at = now() - interval '1 hour' where email = 'student@hth.demo'`);
+  const rows = await as(db, U['orgadmin@hth'], ({ q }) => q('select * from user_logins()'));
+  assert.ok(rows.length >= 5);
+  assert.ok(rows.find((r) => r.id === U['student@hth']).last_sign_in_at);
+  const b = await as(db, U['admin@bistro'], ({ q }) => q('select * from user_logins()'));
+  assert.ok(!b.some((r) => r.id === U['student@hth']));
+  const m = await as(db, U['manager.amsterdam@hth'], ({ q }) => q('select * from user_logins()'));
+  assert.equal(m.length, 0);
+});

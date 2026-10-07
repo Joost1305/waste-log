@@ -5,6 +5,16 @@ import { admin, caller, cors, fail, json, RANK } from '../_shared/common.ts';
 const ROLES = ['employee', 'restaurant_manager', 'org_admin', 'super_admin'];
 const LANGS = ['nl', 'en', 'fy'];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Where the email link sends people: the app's own address. Only https (or localhost) pages are accepted;
+// Supabase additionally only follows addresses on its Redirect URLs list, otherwise it uses the Site URL.
+function redirect(u: unknown): string | undefined {
+  if (typeof u !== 'string') return undefined;
+  try {
+    const url = new URL(u);
+    if (url.protocol === 'https:' || url.hostname === 'localhost') return `${url.origin}${url.pathname}`;
+  } catch { /* ignore */ }
+  return undefined;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -53,14 +63,16 @@ Deno.serve(async (req) => {
     if (!orgId && role !== 'super_admin') return fail(400, 'No organization');
     if (typeof name !== 'string' || !name.trim() || name.length > 120) return fail(400, 'Name is required');
     if (typeof email !== 'string' || !EMAIL.test(email)) return fail(400, 'Valid email is required');
-    if (typeof password !== 'string' || password.length < 8) return fail(400, 'Password must be at least 8 characters');
+    const invite = Boolean(body.invite);
+    if (!invite && (typeof password !== 'string' || password.length < 8)) return fail(400, 'Password must be at least 8 characters');
     if (!LANGS.includes(language)) return fail(400, 'Unknown language');
     const roleErr = checkRole(role); if (roleErr) return roleErr;
     const rids = await checkRestaurants(body.restaurant_ids); if (rids instanceof Response) return rids;
 
-    const { data: created, error } = await sb.auth.admin.createUser({
-      email: email.trim().toLowerCase(), password, email_confirm: true, user_metadata: { name: name.trim() },
-    });
+    // Invite: Supabase emails a link; the person sets their own password in the app.
+    const { data: created, error } = invite
+      ? await sb.auth.admin.inviteUserByEmail(email.trim().toLowerCase(), { data: { name: name.trim() }, redirectTo: redirect(body.redirect_to) })
+      : await sb.auth.admin.createUser({ email: email.trim().toLowerCase(), password, email_confirm: true, user_metadata: { name: name.trim() } });
     if (error || !created.user) return fail(400, error?.message?.includes('registered') ? 'Email already in use' : (error?.message || 'Could not create user'));
     const uid = created.user.id;
     const { error: pErr } = await sb.from('users').insert({
@@ -69,7 +81,7 @@ Deno.serve(async (req) => {
     });
     if (pErr) { await sb.auth.admin.deleteUser(uid); return fail(400, pErr.message); }
     if (rids.length) await sb.from('user_restaurants').insert(rids.map((r) => ({ user_id: uid, restaurant_id: r })));
-    await audit('create', uid, { email, role });
+    await audit(invite ? 'invite' : 'create', uid, { email, role });
     return json({ ok: true, data: { id: uid } }, 201);
   }
 
@@ -121,6 +133,16 @@ Deno.serve(async (req) => {
     }
     await audit('update', target.id, { ...patch, password_changed: Boolean(body.password), restaurants_changed: Boolean(rids) });
     return json({ ok: true, data: { id: target.id } });
+  }
+
+  // Email a link to set a new password (also works for someone who never accepted the invitation).
+  if (action === 'send_reset') {
+    const target = await loadTarget(body.id);
+    if (!target) return fail(404, 'User not found');
+    const { error } = await sb.auth.resetPasswordForEmail(target.email, { redirectTo: redirect(body.redirect_to) });
+    if (error) return fail(400, error.message);
+    await audit('password_reset_sent', target.id, { email: target.email });
+    return json({ ok: true, data: { sent: true } });
   }
 
   if (action === 'delete') {

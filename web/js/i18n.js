@@ -59,6 +59,10 @@ const dict = {
     time: 'Time', weight_source: 'Weight source', ws_manual: 'weighed', ws_scale: 'scale (AI read)', ws_estimate: 'estimated (AI)', unit_cost: 'Price / kg', potential_sales: 'Potential sales value',
     co2_kg: 'CO₂-eq (kg)', has_photo: 'Photo', ai_accepted: 'AI suggestion accepted', yes: 'yes', no: 'no', generated: 'Generated', scope: 'Selection', filters_label: 'Filters',
     lang_switch: 'Language', printed: 'Printed', co2_short: 'Calculation & source',
+    sp_title: 'Choose your password', sp_sub: 'Welcome to WASTE log. Choose a password you will use to sign in from now on.', sp_repeat: 'Repeat password', sp_save: 'Save and continue', sp_mismatch: 'The passwords are not the same.',
+    invite_email: 'Send an invitation by email (they choose their own password)', invite_pending: 'invitation sent', invite_sent: 'Invitation sent to {e}',
+    send_reset: 'Reset link', reset_sent: 'Email with a password link sent to {e}', confirm_reset: 'Send {e} an email with a link to set a new password?', send: 'Send',
+    pw_needed: 'Enter a password (min. 8) or choose to send an invitation.', pw_optional: 'leave empty to keep the current one',
   },
   nl: {
     demo_banner: 'DEMO DATA: fictieve gegevens voor demonstratie',
@@ -116,6 +120,10 @@ const dict = {
     time: 'Tijd', weight_source: 'Bron gewicht', ws_manual: 'gewogen', ws_scale: 'weegschaal (AI)', ws_estimate: 'geschat (AI)', unit_cost: 'Prijs / kg', potential_sales: 'Potentiële verkoopwaarde',
     co2_kg: 'CO₂-eq (kg)', has_photo: 'Foto', ai_accepted: 'AI-voorstel overgenomen', yes: 'ja', no: 'nee', generated: 'Gemaakt op', scope: 'Selectie', filters_label: 'Filters',
     lang_switch: 'Taal', printed: 'Geprint', co2_short: 'Berekening & bron',
+    sp_title: 'Kies je wachtwoord', sp_sub: 'Welkom bij WASTE log. Kies een wachtwoord waarmee je voortaan inlogt.', sp_repeat: 'Herhaal wachtwoord', sp_save: 'Opslaan en verder', sp_mismatch: 'De wachtwoorden zijn niet gelijk.',
+    invite_email: 'Uitnodiging per e-mail sturen (kiest zelf een wachtwoord)', invite_pending: 'uitnodiging verstuurd', invite_sent: 'Uitnodiging verstuurd naar {e}',
+    send_reset: 'Resetlink', reset_sent: 'E-mail met wachtwoordlink verstuurd naar {e}', confirm_reset: '{e} een e-mail sturen met een link om een nieuw wachtwoord in te stellen?', send: 'Versturen',
+    pw_needed: 'Vul een wachtwoord in (min. 8) of kies voor een uitnodiging.', pw_optional: 'leeg laten om het huidige te houden',
   },
 };
 

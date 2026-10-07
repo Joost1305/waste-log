@@ -96,10 +96,10 @@ export function openModal(html, onMount) {
   return close;
 }
 
-export function confirmDialog(message) {
+export function confirmDialog(message, okLabel, danger = true) {
   return new Promise((resolve) => {
     openModal(`<p>${esc(message)}</p><div class="modal-actions">
-      <button data-close>${t('cancel')}</button><button class="btn-primary btn-danger" id="cf-ok">${t('delete')}</button></div>`,
+      <button data-close>${t('cancel')}</button><button class="btn-primary ${danger ? 'btn-danger' : ''}" id="cf-ok">${esc(okLabel || t('delete'))}</button></div>`,
     (card, close) => { card.querySelector('#cf-ok').onclick = () => { close(); resolve(true); };
       card.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => { close(); resolve(false); })); });
   });
