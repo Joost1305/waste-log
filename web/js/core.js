@@ -27,6 +27,16 @@ export async function loadMeta() {
 
 // ------------------------------------------------------------------ formatting
 const locale = () => (lang() === 'en' ? 'en-GB' : 'nl-NL');
+// Accepts ISO strings from Postgres/Supabase ('2026-10-07T19:26:03+00:00', '2026-10-07 19:26:03+00'),
+// plain dates and Date objects. Returns null for anything unreadable instead of throwing.
+function toDate(s) {
+  if (!s) return null;
+  if (s instanceof Date) return Number.isNaN(s.getTime()) ? null : s;
+  let str = String(s).trim().replace(' ', 'T');
+  if (/T\d{2}:\d{2}.*[+-]\d{2}$/.test(str)) str += ':00';
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 export const fmt = {
   kg(n, d = 1) {
     if (n == null) return '–';
@@ -40,9 +50,9 @@ export const fmt = {
     return new Intl.NumberFormat(locale(), { style: 'currency', currency: cur, maximumFractionDigits: d, minimumFractionDigits: d }).format(n);
   },
   pct(n, d = 0) { return n == null ? '–' : `${new Intl.NumberFormat(locale(), { maximumFractionDigits: d }).format(n)}%`; },
-  date(s) { return s ? new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s)) : '–'; },
-  dateTime(s) { return s ? new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(s)) : '–'; },
-  time(s) { return s ? new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(s)) : ''; },
+  date(s) { const d = toDate(s); return d ? new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', year: 'numeric' }).format(d) : '–'; },
+  dateTime(s) { const d = toDate(s); return d ? new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d) : '–'; },
+  time(s) { const d = toDate(s); return d ? new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(d) : ''; },
 };
 export const todayIso = () => new Date().toLocaleDateString('sv-SE');
 export const addDaysIso = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };

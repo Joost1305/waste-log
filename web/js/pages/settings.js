@@ -98,7 +98,7 @@ function sections() {
         [t('name'), (r) => `${esc(r.name)}${r.is_active ? '' : ' <span class="badge">inactive</span>'}`], [t('email'), (r) => esc(r.email)],
         [t('role'), (r) => t('role_' + r.role)],
         [t('restaurants'), (r) => (['org_admin', 'super_admin'].includes(r.role) ? t('all_restaurants') : r.restaurant_ids.map((id) => esc(labelOf(meta.restaurants, id))).join(', '))],
-        [t('last_login'), (r) => fmt.dateTime(r.last_login_at ? r.last_login_at.replace(' ', 'T') + 'Z' : null)],
+        [t('last_login'), (r) => fmt.dateTime(r.last_login_at)],
       ],
       fields: (row) => [
         { name: 'name', label: t('name'), required: true },
@@ -219,7 +219,7 @@ async function renderAudit(el) {
   const rows = (await api('/audit', { query: { limit: 200 } })).data;
   el.innerHTML = `<div class="card"><h2>${t('set_audit')}</h2><div class="table-wrap"><table><thead><tr>
     <th>${t('when')}</th><th>${t('user')}</th><th>${t('action')}</th><th>${t('entity')}</th><th></th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td class="nowrap small">${fmt.dateTime(r.created_at.replace(' ', 'T') + 'Z')}</td><td>${esc(r.user_name || '–')}</td>
+    ${rows.map((r) => `<tr><td class="nowrap small">${fmt.dateTime(r.created_at)}</td><td>${esc(r.user_name || '–')}</td>
       <td><span class="badge">${esc(r.action)}</span></td><td>${esc(r.entity)} ${r.entity_id ? '#' + r.entity_id : ''}</td>
       <td class="small muted">${esc((r.details || '').slice(0, 120))}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
