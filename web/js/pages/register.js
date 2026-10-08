@@ -154,7 +154,7 @@ async function handlePhoto(file) {
       photo.ai = 'done'; photo.suggestion = ai.suggestion;
       // Pre-fill only if the user hasn't chosen anything yet; never overwrite a user choice.
       if (!s.productId && !s.productName && !s.categoryId) applySuggestion(ai.suggestion);
-      else if (!s.weight) { applyWeight(ai.suggestion); renderWeight(); }
+      else { if (!s.weight) { applyWeight(ai.suggestion); renderWeight(); } renderWhat(); }
     } else photo.ai = 'fail';
   } catch (e) {
     if (s.photo !== photo) return;
@@ -228,13 +228,21 @@ function renderWhat() {
   }
   const catLabel = (id) => (meta.waste_categories.find((c) => c.id === id) || {}).label || '';
   const selected = s.productId ? meta.products.find((p) => p.id === s.productId) : null;
+  // Products the AI matched to the photo: shown as their own row of tiles, best match first and pre-selected
+  const sg = s.photo && s.photo.ai === 'done' && s.photo.suggestion;
+  const photoTiles = !q && sg ? (sg.candidates || []).map((c) => meta.products.find((p) => p.id === c.id)).filter(Boolean) : [];
+  if (photoTiles.length) tiles = tiles.filter((p) => !photoTiles.includes(p)).slice(0, 8);
+  const tileHtml = (p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
+      ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`;
   el.className = `step ${done ? 'done' : ''}`;
   el.innerHTML = `
     <div class="step-title"><span class="step-num">2</span>${t('reg_what')}</div>
     <div class="field"><input type="search" id="what-search" placeholder="${t('reg_search')}" value="${esc(s.search)}" autocomplete="off"></div>
+    ${photoTiles.length ? `<div class="small muted" style="margin:-4px 0 8px">&#128247; ${t('reg_photo_matches')}</div>
+      <div class="tiles photo-tiles">${photoTiles.map(tileHtml).join('')}</div>
+      <div style="height:14px"></div>` : ''}
     ${!q && autoCount ? `<div class="small muted" style="margin:-4px 0 8px">${t('reg_top_hint')}</div>` : ''}
-    <div class="tiles">${tiles.map((p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
-      ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`).join('')}
+    <div class="tiles">${tiles.map(tileHtml).join('')}
       ${q && !tiles.some((p) => fold(p.name) === fold(q)) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
     </div>
     ${!s.productId ? `<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">${t('reg_or_category')}</div>

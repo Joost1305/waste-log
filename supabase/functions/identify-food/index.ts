@@ -13,19 +13,42 @@ function norm(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
 }
 
-function matchProduct(name: string, products: { id: number; name: string; waste_category_id: number }[]) {
-  const n = norm(name); if (!n) return null;
-  const tokens = new Set(n.split(/\s+/));
-  let best = null; let bestScore = 0;
+type Product = { id: number; name: string; waste_category_id: number; is_quick_pick?: boolean };
+
+// Rank the kitchen's products against the AI's names (Dutch and English). Whole-word matches count more
+// than partial ones, short plain names beat long ones ("Tomaten" before "Tomatenblokjes"),
+// and products the kitchen registers often or has as quick button get a small boost.
+function rankProducts(names: string[], products: Product[], uses: Map<number, number>) {
+  const queries = names.map(norm).filter(Boolean).map((n) => n.split(/\s+/).filter((t) => t.length > 1));
+  if (!queries.length) return [];
+  const scored: { p: Product; score: number }[] = [];
   for (const p of products) {
     const pn = norm(p.name);
-    if (pn === n) return p;
-    const pt = pn.split(/\s+/);
-    const overlap = pt.filter((t) => tokens.has(t) || [...tokens].some((x) => x.length > 3 && (t.startsWith(x) || x.startsWith(t)))).length;
-    const score = overlap / Math.max(pt.length, tokens.size);
-    if (score > bestScore) { bestScore = score; best = p; }
+    const pt = pn.split(/\s+/).filter(Boolean);
+    let best = 0;
+    for (const q of queries) {
+      if (pn === q.join(' ')) { best = Math.max(best, 2); continue; }
+      let hit = 0;
+      for (const qt of q) {
+        if (pt.includes(qt)) hit += 1;
+        else if (qt.length > 3 && pt.some((t) => t.startsWith(qt) || qt.startsWith(t))) {
+          // stem match (tomaat / tomaten / tomatoes) counts almost fully when the lengths are close
+          const t = pt.find((x) => x.startsWith(qt) || qt.startsWith(x))!;
+          hit += Math.abs(t.length - qt.length) <= 2 ? 0.9 : 0.5;
+        } else if (qt.length > 4 && pt.some((t) => t.slice(0, 5) === qt.slice(0, 5))) hit += 0.6;
+      }
+      if (!hit) continue;
+      const coverage = hit / q.length;                 // how much of the AI name is found
+      const precision = hit / Math.max(pt.length, 1);   // how little else the product name contains
+      best = Math.max(best, coverage * 0.65 + precision * 0.35);
+    }
+    if (best < 0.45) continue;
+    const n = uses.get(p.id) || 0;
+    best += (n ? Math.min(0.2, 0.05 + Math.log10(1 + n) * 0.06) : 0) + (p.is_quick_pick ? 0.05 : 0);
+    scored.push({ p, score: best });
   }
-  return bestScore >= 0.5 ? best : null;
+  scored.sort((a, b) => b.score - a.score || a.p.name.length - b.p.name.length);
+  return scored.slice(0, 6);
 }
 
 function toBase64(buf: ArrayBuffer) {
@@ -85,7 +108,8 @@ Deno.serve(async (req) => {
     'Otherwise estimate the weight of the wasted food in kg from its size, the container and any reference objects, and set weight_source to "estimate".',
     'Only use null for suggested_weight_kg if there is no visible food at all.',
     'confidence is your honest probability (0-1) that product and category are right.',
-    'Answer with ONLY a JSON object: {"product": string, "category_code": string, "subcategory": string|null, "confidence": number, "suggested_weight_kg": number|null, "weight_source": "scale"|"estimate"|null}',
+    'Also give product_en: the same product in plain English (e.g. "Tomatoes").',
+    'Answer with ONLY a JSON object: {"product": string, "product_en": string, "category_code": string, "subcategory": string|null, "confidence": number, "suggested_weight_kg": number|null, "weight_source": "scale"|"estimate"|null}',
   ].join('\n');
 
   try {
@@ -118,7 +142,8 @@ Deno.serve(async (req) => {
       (s.weight_source == null || s.weight_source === 'scale' || s.weight_source === 'estimate');
     if (!valid) { console.error('identify-food: AI answer failed validation', m[0].slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
     const cat = categories.find((c) => c.code === s.category_code) || null;
-    const product = matchProduct(s.product, products);
+    const ranked = rankProducts([s.product, typeof s.product_en === 'string' ? s.product_en.slice(0, 80) : ''], products, uses);
+    const product = ranked.length ? ranked[0].p : null;
     return json({ ok: true, data: { ok: true, available: true, suggestion: {
       product_text: s.product,
       product_id: product ? product.id : null,
@@ -129,6 +154,8 @@ Deno.serve(async (req) => {
       confidence: Math.round(s.confidence * 100) / 100,
       suggested_weight_kg: s.suggested_weight_kg != null ? Math.round(s.suggested_weight_kg * 1000) / 1000 : null,
       weight_source: s.suggested_weight_kg != null ? (s.weight_source === 'scale' ? 'scale' : 'estimate') : null,
+      // other likely products, shown as tiles so the user can switch with one tap
+      candidates: ranked.map((r) => ({ id: r.p.id, name: r.p.name, waste_category_id: r.p.waste_category_id })),
       provider: 'anthropic',
     } } });
   } catch (e) {
