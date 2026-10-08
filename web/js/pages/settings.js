@@ -89,6 +89,9 @@ function sections() {
     },
     p.catalog && {
       key: 'restaurants', title: t('set_restaurants'), endpoint: '/restaurants', canCreate: p.restaurants, canEdit: true, canDelete: p.restaurants, reloadMeta: true,
+      // Public impact page: one link per restaurant (when switched on) and one for the whole organization
+      headerActions: [{ label: `&#127757; ${t('imp_pub_open_all')}`, run: () => openPublic('') }],
+      rowActions: [{ label: t('imp_pub_open'), show: (r) => r.public_impact_enabled, run: (r) => openPublic(r.slug) }],
       columns: [[t('name'), (r) => esc(r.name)], [t('city'), (r) => esc(r.city || '')], [t('public_impact'), (r) => yes(r.public_impact_enabled)]],
       fields: () => [
         { name: 'name', label: t('name'), required: true }, { name: 'city', label: t('city') },
@@ -197,6 +200,14 @@ async function crud(el, cfg) {
   const add = $('#crud-add');
   if (add) add.onclick = () => openForm(null);
   load();
+}
+
+async function openPublic(restSlug) {
+  try {
+    const org = (await api('/my-org-slug')).data;
+    const url = `${location.origin}${location.pathname}#/impact/${encodeURIComponent(org)}${restSlug ? '/' + encodeURIComponent(restSlug) : ''}`;
+    window.open(url, '_blank', 'noopener');
+  } catch (e) { toastError(e); }
 }
 
 async function renderOrg(el) {

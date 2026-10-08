@@ -294,6 +294,11 @@ route('GET', '/co2-factors', async () => {
     .map((r) => ({ ...r, label: r.labels?.[ctx.lang] || r.labels?.en || r.code }));
 });
 
+// public impact page (works without signing in; only restaurants with the page switched on)
+route('GET', '/public-impact', async ({ query }) => check(await sb.rpc('public_impact', {
+  p_org_slug: query.org, p_restaurant_slug: query.restaurant || null, p_lang: ctx.lang })));
+route('GET', '/my-org-slug', async () => check(await sb.rpc('my_org_slug', { p_org: ctx.orgId })));
+
 // dashboard
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang,

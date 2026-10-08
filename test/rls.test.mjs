@@ -273,3 +273,23 @@ test('product names follow the language: English name when set, Dutch otherwise'
   const e = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select export_data(null, null, null, null, null, null, false, 'en') e`)).e);
   assert.ok(e.records.some((r) => r.product === 'Tomatoes (EN)'));
 });
+
+test('public impact page: anonymous visitors see only enabled restaurants, no prices or people', async () => {
+  const slug = (await db.query(`select slug from organizations where id = $1`, [ID.hth])).rows[0].slug;
+  const rs = (await db.query(`select slug, public_impact_enabled from restaurants where organization_id = $1 order by id`, [ID.hth])).rows;
+  const on = rs.find((r) => r.public_impact_enabled);
+  const page = await as(db, null, async ({ one }) => (await one(`select public_impact($1, $2, 'en') p`, [slug, on.slug])).p);
+  assert.ok(page && page.last30 && Array.isArray(page.trend) && page.categories.length > 0);
+  const text = JSON.stringify(page);
+  assert.ok(!/"(purchase_value|value|potential_sales_value|unit_cost_per_kg|user|user_name|email|photo_path)"\s*:/.test(text), 'no prices, users or photos');
+  await db.query(`update restaurants set public_impact_enabled = false where organization_id = $1 and slug = $2`, [ID.hth, on.slug]);
+  const hidden = await as(db, null, async ({ one }) => (await one(`select public_impact($1, $2) p`, [slug, on.slug])).p);
+  assert.equal(hidden, null);
+  await db.query(`update restaurants set public_impact_enabled = true where organization_id = $1 and slug = $2`, [ID.hth, on.slug]);
+  const org = await as(db, null, async ({ one }) => (await one(`select public_impact($1) p`, [slug])).p);
+  assert.equal(org.scope, 'organization');
+  assert.ok(org.restaurants.every((r) => rs.find((x) => x.slug === r.slug).public_impact_enabled));
+  const nope = await as(db, null, async ({ one }) => (await one(`select public_impact('does-not-exist') p`)).p);
+  assert.equal(nope, null);
+  await assert.rejects(as(db, null, ({ q }) => q('select * from waste_records limit 1')));
+});

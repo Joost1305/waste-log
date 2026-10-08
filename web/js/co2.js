@@ -6,11 +6,12 @@ import { t } from './i18n.js';
 let cache = null;
 
 // record (optional): { weight_kg, co2e_kg, waste_category_id } to show this registration's own calculation
-export async function showCo2Info(record) {
+export async function showCo2Info(record, given) {
+  // `given`: factors handed in by a page that has them already (the public page, where visitors are not signed in)
   try {
-    if (!cache) cache = (await api('/co2-factors')).data;
+    if (!given && !cache) cache = (await api('/co2-factors')).data;
   } catch (e) { toastError(e); return; }
-  const factors = cache;
+  const factors = given || cache;
   const sources = [...new Map(factors.filter((f) => f.co2e_source).map((f) => [f.co2e_source + (f.co2e_source_url || ''), f])).values()];
   const ex = factors.find((f) => f.code === 'vegetables') || factors[0];
   const own = record && factors.find((f) => f.id === record.waste_category_id);

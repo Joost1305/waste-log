@@ -10,6 +10,7 @@ import { renderDashboard } from './pages/dashboard.js';
 import { renderSettings } from './pages/settings.js';
 import { renderProfile } from './pages/profile.js';
 import { renderSetPassword } from './pages/set-password.js';
+import { renderImpact } from './pages/impact.js';
 
 const routes = [
   { path: 'register', render: renderRegister, nav: 'nav_register', show: () => true },
@@ -96,6 +97,8 @@ async function route() {
     location.hash = '#/login';
     return;
   }
+  // Public impact page: open to everyone, no sign-in, no app menu
+  if (path === 'impact') { window.scrollTo(0, 0); return renderImpact(rest); }
   if (path === 'login') {
     state.user = null;
     await renderShell();
@@ -114,7 +117,7 @@ window.addEventListener('hashchange', route);
 window.addEventListener('fw:lang', async () => { resetCo2Cache(); if (state.user) await loadMeta(); route(); });
 // Opening the app (or reopening a saved tab or home-screen icon) always lands on registration,
 // whatever page was open last time. Invitation and password links are left alone.
-if (!authLink && !/^#\/login/.test(location.hash) && location.hash !== '#/register') {
+if (!authLink && !/^#\/(login|impact)/.test(location.hash) && location.hash !== '#/register') {
   history.replaceState(null, '', `${location.pathname}${location.search}#/register`);
 }
 route();
