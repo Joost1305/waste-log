@@ -20,8 +20,9 @@ const routes = [
   { path: 'profile', render: renderProfile, nav: 'nav_profile', show: () => true },
 ];
 
+// Everyone starts on registration: that is the page used most, on the kitchen floor.
 function homePath() {
-  return state.meta && state.meta.permissions.dashboard ? 'dashboard' : 'register';
+  return 'register';
 }
 
 async function ensureSession() {
@@ -111,4 +112,9 @@ async function route() {
 
 window.addEventListener('hashchange', route);
 window.addEventListener('fw:lang', async () => { resetCo2Cache(); if (state.user) await loadMeta(); route(); });
+// Opening the app (or reopening a saved tab or home-screen icon) always lands on registration,
+// whatever page was open last time. Invitation and password links are left alone.
+if (!authLink && !/^#\/login/.test(location.hash) && location.hash !== '#/register') {
+  history.replaceState(null, '', `${location.pathname}${location.search}#/register`);
+}
 route();
