@@ -165,13 +165,45 @@ async function handlePhoto(file) {
 // ------------------------------------------------------------------ what
 function recentIds() { try { return JSON.parse(localStorage.getItem(LS.recent) || '[]'); } catch { return []; } }
 
+// Product search as you type: ignores accents and capitals, words in any order ("kip dij" finds
+// "Kipdijfilet"), best matches first: name starts with it, then a word starts with it, then anywhere.
+// Quick buttons and your recent products go first among equal matches.
+const fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+let searchIndex = null;
+function searchProducts(products, query, recent) {
+  if (!searchIndex || searchIndex.list !== products) {
+    searchIndex = { list: products, items: products.map((p) => { const n = fold(p.name); return { p, n, words: n.split(/[^a-z0-9]+/).filter(Boolean) }; }) };
+  }
+  const terms = fold(query).split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const rec = new Map(recent.map((id, i) => [id, i]));
+  const out = [];
+  for (const it of searchIndex.items) {
+    let score = 0;
+    let ok = true;
+    for (const term of terms) {
+      if (it.n.startsWith(term)) score += 3;
+      else if (it.words.some((w) => w.startsWith(term))) score += 2;
+      else if (it.n.includes(term)) score += 1;
+      else { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (it.n === fold(query).trim()) score += 10;
+    if (it.p.is_quick_pick) score += 1.5;
+    if (rec.has(it.p.id)) score += 2 - rec.get(it.p.id) / 20;
+    out.push([score, it.n.length, it.p]);
+  }
+  out.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  return out.map((x) => x[2]);
+}
+
 function renderWhat() {
   const meta = state.meta;
   const el = $('#sec-what');
   const done = Boolean(s.productId || s.categoryId);
   const q = s.search.trim().toLowerCase();
   let tiles;
-  if (q) tiles = meta.products.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 12);
+  if (q) tiles = searchProducts(meta.products, q, recentIds()).slice(0, 12);
   else {
     const rec = recentIds().map((id) => meta.products.find((p) => p.id === id)).filter(Boolean);
     const quick = meta.products.filter((p) => p.is_quick_pick && !rec.includes(p));
@@ -185,7 +217,7 @@ function renderWhat() {
     <div class="field"><input type="search" id="what-search" placeholder="${t('reg_search')}" value="${esc(s.search)}" autocomplete="off"></div>
     <div class="tiles">${tiles.map((p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
       ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`).join('')}
-      ${q && !tiles.some((p) => p.name.toLowerCase() === q) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
+      ${q && !tiles.some((p) => fold(p.name) === fold(q)) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
     </div>
     ${!s.productId ? `<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">${t('reg_or_category')}</div>
       <div class="chips">${meta.waste_categories.map((c) =>
