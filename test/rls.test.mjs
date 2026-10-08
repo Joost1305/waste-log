@@ -235,3 +235,17 @@ test('user logins: org admins see last login of their own organization only', as
   const m = await as(db, U['manager.amsterdam@hth'], ({ q }) => q('select * from user_logins()'));
   assert.equal(m.length, 0);
 });
+
+test('top products: whole kitchen for an employee, only own restaurants', async () => {
+  const s = await as(db, U['student@hth'], ({ q }) => q('select * from top_products($1, 60, 12)', [ID.ams]));
+  assert.ok(s.length > 0 && s.length <= 12);
+  const counts = s.map((r) => Number(r.n));
+  assert.deepEqual(counts, [...counts].sort((a, b) => b - a));
+  // more than the student's own records: it is the kitchen's list
+  const own = (await db.query(`select count(distinct product_id)::int n from waste_records where user_id = $1 and restaurant_id = $2 and product_id is not null`, [U['student@hth'], ID.ams])).rows[0].n;
+  assert.ok(s.length >= Math.min(own, 12));
+  const other = await as(db, U['student@hth'], ({ q }) => q('select * from top_products($1)', [ID.hague]));
+  assert.equal(other.length, 0);
+  const bistro = await as(db, U['admin@bistro'], ({ q }) => q('select * from top_products($1)', [ID.ams]));
+  assert.equal(bistro.length, 0);
+});

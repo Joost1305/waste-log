@@ -265,6 +265,10 @@ route('POST', '/waste/photo', async ({ form }) => {
 });
 route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food', { photo_path: body.photo_path, lang: ctx.lang }));
 
+// automatic quick buttons: the restaurant's most registered products (last 30 days)
+route('GET', '/top-products', async ({ query }) =>
+  check(await sb.rpc('top_products', { p_restaurant: num(query.restaurant_id), p_days: num(query.days) || 30, p_limit: num(query.limit) || 12 })));
+
 // gallery: photos, heaviest first
 route('GET', '/gallery', async ({ query }) => {
   const res = check(await sb.rpc('gallery', {

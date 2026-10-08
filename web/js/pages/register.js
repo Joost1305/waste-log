@@ -53,6 +53,7 @@ export async function renderRegister() {
 
 function renderAll() {
   renderRestaurant(); renderPhoto(); renderWhat(); renderWeight(); renderReason(); renderMore(); updateSave();
+  loadTop();
 }
 
 // ------------------------------------------------------------------ restaurant
@@ -65,7 +66,7 @@ function renderRestaurant() {
   $$('[data-r]', el).forEach((b) => (b.onclick = () => {
     s.restaurantId = Number(b.dataset.r);
     localStorage.setItem(LS.restaurant, String(s.restaurantId));
-    renderRestaurant(); renderMore(); loadToday();
+    renderRestaurant(); renderMore(); renderWhat(); loadToday(); loadTop();
   }));
 }
 
@@ -163,6 +164,18 @@ async function handlePhoto(file) {
 }
 
 // ------------------------------------------------------------------ what
+// Automatic quick buttons per restaurant, fetched once per restaurant and refreshed after saving
+const topCache = new Map();
+async function loadTop(force = false) {
+  const rid = s.restaurantId;
+  if (!rid || (!force && topCache.has(rid))) return;
+  try {
+    const rows = (await api('/top-products', { query: { restaurant_id: rid } })).data || [];
+    topCache.set(rid, rows.map((r) => Number(r.product_id)));
+    if (rid === s.restaurantId && !s.search) renderWhat();
+  } catch { topCache.set(rid, []); }
+}
+
 function recentIds() { try { return JSON.parse(localStorage.getItem(LS.recent) || '[]'); } catch { return []; } }
 
 // Product search as you type: ignores accents and capitals, words in any order ("kip dij" finds
@@ -202,12 +215,16 @@ function renderWhat() {
   const el = $('#sec-what');
   const done = Boolean(s.productId || s.categoryId);
   const q = s.search.trim().toLowerCase();
-  let tiles;
+  let tiles; let autoCount = 0;
   if (q) tiles = searchProducts(meta.products, q, recentIds()).slice(0, 12);
   else {
-    const rec = recentIds().map((id) => meta.products.find((p) => p.id === id)).filter(Boolean);
-    const quick = meta.products.filter((p) => p.is_quick_pick && !rec.includes(p));
-    tiles = [...rec, ...quick].slice(0, 12);
+    // Most registered in this restaurant first, then pinned quick buttons, then this device's recent products
+    const byId = (id) => meta.products.find((p) => p.id === id);
+    const top = (topCache.get(s.restaurantId) || []).map(byId).filter(Boolean);
+    const quick = meta.products.filter((p) => p.is_quick_pick);
+    const rec = recentIds().map(byId).filter(Boolean);
+    tiles = [...new Set([...top, ...quick, ...rec])].slice(0, 12);
+    autoCount = top.length;
   }
   const catLabel = (id) => (meta.waste_categories.find((c) => c.id === id) || {}).label || '';
   const selected = s.productId ? meta.products.find((p) => p.id === s.productId) : null;
@@ -215,6 +232,7 @@ function renderWhat() {
   el.innerHTML = `
     <div class="step-title"><span class="step-num">2</span>${t('reg_what')}</div>
     <div class="field"><input type="search" id="what-search" placeholder="${t('reg_search')}" value="${esc(s.search)}" autocomplete="off"></div>
+    ${!q && autoCount ? `<div class="small muted" style="margin:-4px 0 8px">${t('reg_top_hint')}</div>` : ''}
     <div class="tiles">${tiles.map((p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
       ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`).join('')}
       ${q && !tiles.some((p) => fold(p.name) === fold(q)) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
@@ -376,7 +394,7 @@ async function save() {
     $('#sec-more').open = false;
     renderAll();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    loadToday();
+    loadToday(); loadTop(true);
   } catch (e) {
     s.saving = false; updateSave(); toastError(e);
   }
