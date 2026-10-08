@@ -39,14 +39,17 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return fail(405, 'Method not allowed');
   const sb = admin();
   const me = await caller(req, sb);
-  if (!me || !me.organization_id) return fail(401, 'Not signed in');
+  if (!me) return fail(401, 'Not signed in');
   const { KEY, MODEL } = env();
   if (!KEY) return json({ ok: true, data: { ok: false, available: false } });
 
   let body: { photo_path?: string; lang?: string };
   try { body = await req.json(); } catch { return fail(400, 'Invalid JSON'); }
   const path = String(body.photo_path || '');
-  if (!path.startsWith(`org-${me.organization_id}/`) || path.includes('..')) return fail(404, 'Photo not found');
+  // The organization comes from the user; a super admin (no organization of their own) works in the photo's organization
+  const pathOrg = Number((/^org-(\d+)\//.exec(path) || [])[1]) || null;
+  const orgId = me.role === 'super_admin' ? pathOrg : me.organization_id;
+  if (!orgId || pathOrg !== orgId || path.includes('..')) return fail(404, 'Photo not found');
 
   const { data: file, error } = await sb.storage.from('waste-photos').download(path);
   if (error || !file) return fail(404, 'Photo not found');
@@ -54,15 +57,15 @@ Deno.serve(async (req) => {
 
   const since = new Date(Date.now() - 90 * 86400000).toISOString();
   const [{ data: cats }, { data: recent }] = await Promise.all([
-    sb.from('waste_categories').select('id, code').or(`organization_id.is.null,organization_id.eq.${me.organization_id}`).eq('is_active', true),
-    sb.from('waste_records').select('product_id').eq('organization_id', me.organization_id).not('product_id', 'is', null)
+    sb.from('waste_categories').select('id, code').or(`organization_id.is.null,organization_id.eq.${orgId}`).eq('is_active', true),
+    sb.from('waste_records').select('product_id').eq('organization_id', orgId).not('product_id', 'is', null)
       .is('deleted_at', null).gte('recorded_at', since).limit(5000),
   ]);
   // All active products (paged: Supabase returns at most 1000 rows per request), used to match the AI's answer
   const products: { id: number; name: string; waste_category_id: number; is_quick_pick: boolean }[] = [];
   for (let from = 0; from < 20000; from += 1000) {
     const { data: page } = await sb.from('products').select('id, name, waste_category_id, is_quick_pick')
-      .eq('organization_id', me.organization_id).eq('is_active', true).is('deleted_at', null).order('id').range(from, from + 999);
+      .eq('organization_id', orgId).eq('is_active', true).is('deleted_at', null).order('id').range(from, from + 999);
     products.push(...(page || []));
     if (!page || page.length < 1000) break;
   }

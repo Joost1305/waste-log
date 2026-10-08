@@ -260,7 +260,7 @@ route('POST', '/waste/photo', async ({ form }) => {
   const month = new Date().toISOString().slice(0, 7);
   const path = `org-${ctx.orgId}/${month}/${crypto.randomUUID()}.jpg`;
   const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
-  if (error) throw new ApiError(400, error.message);
+  if (error) throw new ApiError(403, /row-level security/i.test(error.message) ? 'No permission to save a photo for this organization' : error.message);
   return { photo_path: path };
 });
 route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food', { photo_path: body.photo_path, lang: ctx.lang }));

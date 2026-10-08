@@ -249,3 +249,12 @@ test('top products: whole kitchen for an employee, only own restaurants', async 
   const bistro = await as(db, U['admin@bistro'], ({ q }) => q('select * from top_products($1)', [ID.ams]));
   assert.equal(bistro.length, 0);
 });
+
+test('photo upload: own organization folder only; super admin may use any existing organization', async () => {
+  const up = (uid, path) => as(db, uid, ({ q }) => q(`insert into storage.objects (bucket_id, name, owner_id) values ('waste-photos', $1, auth.uid()::text)`, [path]).then(() => [1]));
+  assert.equal((await up(U['student@hth'], `org-${ID.hth}/2026-10/a.jpg`)).length, 1);
+  await assert.rejects(up(U['student@hth'], `org-${ID.bistro}/2026-10/b.jpg`));
+  assert.equal((await up(U['admin@platform'], `org-${ID.hth}/2026-10/c.jpg`)).length, 1);
+  assert.equal((await up(U['admin@platform'], `org-${ID.bistro}/2026-10/d.jpg`)).length, 1);
+  await assert.rejects(up(U['admin@platform'], `org-99999/2026-10/e.jpg`));
+});
