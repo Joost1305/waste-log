@@ -147,8 +147,17 @@ const catalog = {
 };
 const flat = (r) => ({ ...r, supplier_name: r.suppliers?.name, restaurant_name: r.restaurants?.name });
 for (const [path, c] of Object.entries(catalog)) {
-  route('GET', `/${path}`, async () => check(await sb.from(c.table).select(c.select).eq('organization_id', ctx.orgId).is('deleted_at', null)
-    .order(path === 'targets' ? 'start_date' : 'name', { ascending: path !== 'targets' })).map(flat));
+  route('GET', `/${path}`, async () => {
+    // Supabase returns at most 1000 rows per request: page through long lists (e.g. thousands of products)
+    const all = [];
+    for (let from = 0; from < 50000; from += 1000) {
+      const page = check(await sb.from(c.table).select(c.select).eq('organization_id', ctx.orgId).is('deleted_at', null)
+        .order(path === 'targets' ? 'start_date' : 'name', { ascending: path !== 'targets' }).order('id').range(from, from + 999));
+      all.push(...page);
+      if (page.length < 1000) break;
+    }
+    return all.map(flat);
+  });
   route('POST', `/${path}`, async ({ body }) => {
     const row = { ...pick(body, c.fields), organization_id: ctx.orgId };
     if (path === 'targets') row.created_by = (ctx.profile || await profile()).id;
@@ -161,9 +170,15 @@ for (const [path, c] of Object.entries(catalog)) {
 // Product import from Excel: create missing suppliers, add new products, optionally update existing ones.
 route('POST', '/products/import', async ({ body }) => {
   const norm = (x) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
-  const rows = (body.rows || []).filter((r) => r.name && String(r.name).trim()).slice(0, 5000);
+  const rows = (body.rows || []).filter((r) => r.name && String(r.name).trim()).slice(0, 15000);
   const price = (v) => (v == null || !Number.isFinite(Number(v)) || Number(v) < 0 ? null : Math.round(Number(v) * 100) / 100);
-  const products = check(await sb.from('products').select('id, name').eq('organization_id', ctx.orgId).is('deleted_at', null));
+  // Supabase returns at most 1000 rows per request: page through existing products
+  const products = [];
+  for (let from = 0; ; from += 1000) {
+    const page = check(await sb.from('products').select('id, name').eq('organization_id', ctx.orgId).is('deleted_at', null).order('id').range(from, from + 999));
+    products.push(...page);
+    if (page.length < 1000) break;
+  }
   let suppliers = check(await sb.from('suppliers').select('id, name').eq('organization_id', ctx.orgId).is('deleted_at', null));
   const supNames = [...new Map(rows.filter((r) => r.supplier).map((r) => [norm(r.supplier), String(r.supplier).trim()])).entries()]
     .filter(([k]) => !suppliers.some((s) => norm(s.name) === k)).map(([, v]) => v);

@@ -52,17 +52,32 @@ Deno.serve(async (req) => {
   if (error || !file) return fail(404, 'Photo not found');
   const mime = file.type && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
 
-  const [{ data: cats }, { data: prods }] = await Promise.all([
+  const since = new Date(Date.now() - 90 * 86400000).toISOString();
+  const [{ data: cats }, { data: recent }] = await Promise.all([
     sb.from('waste_categories').select('id, code').or(`organization_id.is.null,organization_id.eq.${me.organization_id}`).eq('is_active', true),
-    sb.from('products').select('id, name, waste_category_id').eq('organization_id', me.organization_id).eq('is_active', true).is('deleted_at', null)
-      .order('is_quick_pick', { ascending: false }).order('name').limit(1000),
+    sb.from('waste_records').select('product_id').eq('organization_id', me.organization_id).not('product_id', 'is', null)
+      .is('deleted_at', null).gte('recorded_at', since).limit(5000),
   ]);
-  const categories = cats || []; const products = prods || [];
+  // All active products (paged: Supabase returns at most 1000 rows per request), used to match the AI's answer
+  const products: { id: number; name: string; waste_category_id: number; is_quick_pick: boolean }[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data: page } = await sb.from('products').select('id, name, waste_category_id, is_quick_pick')
+      .eq('organization_id', me.organization_id).eq('is_active', true).is('deleted_at', null).order('id').range(from, from + 999);
+    products.push(...(page || []));
+    if (!page || page.length < 1000) break;
+  }
+  const categories = cats || [];
+  // The prompt names the kitchen's most relevant products: quick buttons first, then the most registered in 90 days
+  const uses = new Map<number, number>();
+  for (const r of recent || []) uses.set(r.product_id, (uses.get(r.product_id) || 0) + 1);
+  const promptProducts = [...products].filter((p) => p.is_quick_pick || uses.has(p.id))
+    .sort((a, b) => Number(b.is_quick_pick) - Number(a.is_quick_pick) || (uses.get(b.id) || 0) - (uses.get(a.id) || 0)).slice(0, 250);
 
   const prompt = [
     'You help a professional kitchen register food waste. Look at the photo and identify the main food that is being thrown away.',
     `Choose category_code from exactly this list: ${categories.map((c) => c.code).join(', ')}.`,
-    `If it clearly matches one of the kitchen's own products, use that product name: ${products.slice(0, 250).map((p) => p.name).join('; ')}.`,
+    promptProducts.length ? `If it clearly matches one of the kitchen's most used products, use that product name: ${promptProducts.map((p) => p.name).join('; ')}.` : 'Name the product in plain words.',
+    'Write the product name the way a Dutch professional kitchen lists it (in Dutch, e.g. "Tomaten", "Kipdijfilet", "Stokbrood"), so it can be matched to the kitchen\'s product list.',
     'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
     'Otherwise estimate the weight of the wasted food in kg from its size, the container and any reference objects, and set weight_source to "estimate".',
     'Only use null for suggested_weight_kg if there is no visible food at all.',
