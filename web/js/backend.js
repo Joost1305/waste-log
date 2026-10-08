@@ -141,7 +141,7 @@ route('GET', '/audit', async ({ query }) => {
 // catalog: suppliers, products, menu items, targets
 const catalog = {
   suppliers: { table: 'suppliers', select: '*', fields: ['name', 'contact'] },
-  products: { table: 'products', select: '*, suppliers(name)', fields: ['name', 'waste_category_id', 'category_id', 'default_supplier_id', 'purchase_price_per_kg', 'sales_price_per_kg', 'is_quick_pick', 'is_active'] },
+  products: { table: 'products', select: '*, suppliers(name)', fields: ['name', 'name_en', 'waste_category_id', 'category_id', 'default_supplier_id', 'purchase_price_per_kg', 'sales_price_per_kg', 'is_quick_pick', 'is_active'] },
   'menu-items': { table: 'menu_items', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'portion_size_g', 'sales_price', 'cost_price', 'is_active'] },
   targets: { table: 'targets', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'period', 'baseline_kg', 'target_kg', 'start_date', 'end_date'] },
 };
@@ -190,7 +190,7 @@ route('POST', '/products/import', async ({ body }) => {
   const byName = new Map(products.map((p) => [norm(p.name), p.id]));
   const fresh = []; const updates = [];
   for (const r of rows) {
-    const row = { name: String(r.name).trim().slice(0, 200), waste_category_id: Number(r.waste_category_id),
+    const row = { name: String(r.name).trim().slice(0, 200), name_en: r.name_en ? String(r.name_en).trim().slice(0, 200) : null, waste_category_id: Number(r.waste_category_id),
       purchase_price_per_kg: price(r.purchase_price_per_kg), sales_price_per_kg: price(r.sales_price_per_kg), default_supplier_id: supId(r.supplier) };
     const id = byName.get(norm(row.name));
     if (id) { if (body.update) updates.push({ id, row }); } else { fresh.push({ ...row, organization_id: ctx.orgId, is_active: true }); byName.set(norm(row.name), -1); }
@@ -198,6 +198,7 @@ route('POST', '/products/import', async ({ body }) => {
   for (let i = 0; i < fresh.length; i += 200) check(await sb.from('products').insert(fresh.slice(i, i + 200)).select('id'));
   for (const u of updates) {
     const patch = { waste_category_id: u.row.waste_category_id };
+    if (u.row.name_en) patch.name_en = u.row.name_en;
     if (u.row.purchase_price_per_kg != null) patch.purchase_price_per_kg = u.row.purchase_price_per_kg;
     if (u.row.sales_price_per_kg != null) patch.sales_price_per_kg = u.row.sales_price_per_kg;
     if (u.row.default_supplier_id) patch.default_supplier_id = u.row.default_supplier_id;

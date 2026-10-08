@@ -90,7 +90,7 @@ function renderPhoto() {
     const cat = state.meta.waste_categories.find((c) => c.id === sg.waste_category_id);
     const applied = s.productId === sg.product_id && s.categoryId === sg.waste_category_id && (sg.product_id || s.productName === sg.product_name);
     ai = `<div class="ai-card"><div class="small muted">${t('reg_ai_suggest')}</div>
-      <strong>${esc(sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
+      <strong>${esc((state.meta.products.find((x) => x.id === sg.product_id) || {}).name || sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
       ${applied ? '' : `<div style="margin-top:6px"><button type="button" class="btn-sm btn-primary" id="ai-use">${t('reg_ai_use')}</button></div>`}
       <div class="ai-note">${t('reg_ai_note')}</div></div>`;
   } else ai = `<div class="ai-card off">${p.ai === 'off' ? t('reg_ai_off') : t('reg_ai_fail')}</div>`;
@@ -185,7 +185,11 @@ const fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0
 let searchIndex = null;
 function searchProducts(products, query, recent) {
   if (!searchIndex || searchIndex.list !== products) {
-    searchIndex = { list: products, items: products.map((p) => { const n = fold(p.name); return { p, n, words: n.split(/[^a-z0-9]+/).filter(Boolean) }; }) };
+    searchIndex = { list: products, items: products.map((p) => {
+      // search the shown name first, and also the other language
+      const n = fold(p.name); const all = fold([p.name, p.name_nl, p.name_en].filter(Boolean).join(' '));
+      return { p, n, all, words: all.split(/[^a-z0-9]+/).filter(Boolean) };
+    }) };
   }
   const terms = fold(query).split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
@@ -197,7 +201,7 @@ function searchProducts(products, query, recent) {
     for (const term of terms) {
       if (it.n.startsWith(term)) score += 3;
       else if (it.words.some((w) => w.startsWith(term))) score += 2;
-      else if (it.n.includes(term)) score += 1;
+      else if (it.all.includes(term)) score += 1;
       else { ok = false; break; }
     }
     if (!ok) continue;

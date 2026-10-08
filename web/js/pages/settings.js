@@ -19,13 +19,15 @@ function sections() {
       headerActions: [{ label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
       columns: [
         [t('name'), (r) => `${esc(r.name)} ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}`],
+        [t('name_en_col'), (r) => `<span class="muted">${esc(r.name_en || '')}</span>`],
         [t('category'), (r) => esc(labelOf(meta.waste_categories, r.waste_category_id))],
         [t('reg_supplier'), (r) => esc(r.supplier_name || '')],
         [t('price_kg'), (r) => fmt.money(r.purchase_price_per_kg, 2), true],
         [t('quick_pick'), (r) => yes(r.is_quick_pick)],
       ],
       fields: () => [
-        { name: 'name', label: t('name'), required: true },
+        { name: 'name', label: t('name_nl_field'), required: true },
+        { name: 'name_en', label: t('name_en_field') },
         { name: 'waste_category_id', label: t('category'), type: 'select', blank: false, options: catOpts() },
         { name: 'category_id', label: t('subcategory'), type: 'select', options: meta.subcategories.map((c) => ({ value: c.id, label: `${labelOf(meta.waste_categories, c.waste_category_id)} › ${c.label}` })) },
         { name: 'default_supplier_id', label: t('default_supplier'), type: 'select', options: meta.suppliers.map((s) => ({ value: s.id, label: s.name })) },

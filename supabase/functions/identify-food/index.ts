@@ -13,7 +13,7 @@ function norm(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim();
 }
 
-type Product = { id: number; name: string; waste_category_id: number; is_quick_pick?: boolean };
+type Product = { id: number; name: string; name_en?: string | null; waste_category_id: number; is_quick_pick?: boolean };
 
 // Rank the kitchen's products against the AI's names (Dutch and English). Whole-word matches count more
 // than partial ones, short plain names beat long ones ("Tomaten" before "Tomatenblokjes"),
@@ -23,9 +23,10 @@ function rankProducts(names: string[], products: Product[], uses: Map<number, nu
   if (!queries.length) return [];
   const scored: { p: Product; score: number }[] = [];
   for (const p of products) {
-    const pn = norm(p.name);
-    const pt = pn.split(/\s+/).filter(Boolean);
     let best = 0;
+    // match against the Dutch and the English product name, keep the best
+    for (const pn of [p.name, p.name_en].filter(Boolean).map((x) => norm(x as string))) {
+    const pt = pn.split(/\s+/).filter(Boolean);
     for (const q of queries) {
       if (pn === q.join(' ')) { best = Math.max(best, 2); continue; }
       let hit = 0;
@@ -36,13 +37,16 @@ function rankProducts(names: string[], products: Product[], uses: Map<number, nu
           const t = pt.find((x) => x.startsWith(qt) || qt.startsWith(x))!;
           hit += Math.abs(t.length - qt.length) <= 2 ? 0.9 : 0.5;
         } else if (qt.length > 4 && pt.some((t) => t.slice(0, 5) === qt.slice(0, 5))) hit += 0.6;
+        // Dutch compounds: ijsbergsla ends in sla, kipborstfilet ends in filet
+        else if (pt.some((t) => t.length > 2 && qt.length > t.length + 2 && qt.endsWith(t))) hit += 0.7;
       }
       if (!hit) continue;
       const coverage = hit / q.length;                 // how much of the AI name is found
       const precision = hit / Math.max(pt.length, 1);   // how little else the product name contains
       best = Math.max(best, coverage * 0.65 + precision * 0.35);
     }
-    if (best < 0.45) continue;
+    }
+    if (best < 0.42) continue;
     const n = uses.get(p.id) || 0;
     best += (n ? Math.min(0.2, 0.05 + Math.log10(1 + n) * 0.06) : 0) + (p.is_quick_pick ? 0.05 : 0);
     scored.push({ p, score: best });
@@ -85,9 +89,9 @@ Deno.serve(async (req) => {
       .is('deleted_at', null).gte('recorded_at', since).limit(5000),
   ]);
   // All active products (paged: Supabase returns at most 1000 rows per request), used to match the AI's answer
-  const products: { id: number; name: string; waste_category_id: number; is_quick_pick: boolean }[] = [];
+  const products: Product[] = [];
   for (let from = 0; from < 20000; from += 1000) {
-    const { data: page } = await sb.from('products').select('id, name, waste_category_id, is_quick_pick')
+    const { data: page } = await sb.from('products').select('id, name, name_en, waste_category_id, is_quick_pick')
       .eq('organization_id', orgId).eq('is_active', true).is('deleted_at', null).order('id').range(from, from + 999);
     products.push(...(page || []));
     if (!page || page.length < 1000) break;

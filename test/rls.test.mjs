@@ -258,3 +258,18 @@ test('photo upload: own organization folder only; super admin may use any existi
   assert.equal((await up(U['admin@platform'], `org-${ID.bistro}/2026-10/d.jpg`)).length, 1);
   await assert.rejects(up(U['admin@platform'], `org-99999/2026-10/e.jpg`));
 });
+
+test('product names follow the language: English name when set, Dutch otherwise', async () => {
+  await db.query(`update products set name_en = 'Tomatoes (EN)' where id = $1`, [ID.tomato]);
+  const en = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select app_meta(null, 'en') m`)).m);
+  const nl = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select app_meta(null, 'nl') m`)).m);
+  assert.equal(en.products.find((p) => p.id === ID.tomato).name, 'Tomatoes (EN)');
+  assert.equal(nl.products.find((p) => p.id === ID.tomato).name, 'Tomatoes');
+  assert.equal(en.products.find((p) => p.id === ID.tomato).name_nl, 'Tomatoes');
+  const l = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select list_waste(null, null, null, null, null, null, false, 500, 0, 'en') l`)).l);
+  assert.ok(l.rows.some((r) => r.product_id === ID.tomato && r.product_name === 'Tomatoes (EN)'));
+  const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard(null, null, current_date - 60, current_date, 'en') d`)).d);
+  assert.ok(Array.isArray(d.top_products));
+  const e = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select export_data(null, null, null, null, null, null, false, 'en') e`)).e);
+  assert.ok(e.records.some((r) => r.product === 'Tomatoes (EN)'));
+});

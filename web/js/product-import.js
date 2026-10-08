@@ -9,13 +9,14 @@ const norm = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-
 
 // Which header words point to which field (English and Dutch, as people write them in practice)
 const HEADERS = {
+  name_en: ['english', 'engels', 'name en', 'name_en', 'naam en', 'name (en)'],
   name: ['product', 'name', 'naam', 'artikel', 'omschrijving', 'description', 'item', 'ingredient'],
   category: ['category', 'categorie', 'groep', 'group', 'productgroep', 'type', 'soort'],
   price: ['purchase', 'inkoop', 'price', 'prijs', 'cost', 'kostprijs'],
   sales: ['sales', 'verkoop', 'selling'],
   supplier: ['supplier', 'leverancier', 'vendor', 'groothandel'],
 };
-const FIELDS = ['name', 'category', 'price', 'sales', 'supplier'];
+const FIELDS = ['name_en', 'name', 'category', 'price', 'sales', 'supplier'];
 
 // Words that hint at a category, checked in the category column first and then in the product name
 const HINTS = {
@@ -86,12 +87,12 @@ export async function openProductImport(onDone) {
     const body = card.querySelector('#imp-body');
     const go = card.querySelector('#imp-go');
     card.querySelector('#imp-template').onclick = () => downloadBlob(buildXlsx([{ name: t('set_products'), rows: [
-      [t('imp_col_name'), t('imp_col_category'), t('imp_col_price'), t('imp_col_sales'), t('imp_col_supplier')],
-      ['Tomatoes', 'Vegetables', 3.2, null, 'Fresh Farms'], ['Chicken thigh', 'Meat', 8.9, null, 'Butcher Jansen'], ['Sourdough bread', 'Bread & bakery', 4.5, null, ''],
+      [t('imp_col_name'), t('imp_col_name_en'), t('imp_col_category'), t('imp_col_price'), t('imp_col_sales'), t('imp_col_supplier')],
+      ['Tomaten', 'Tomatoes', 'Vegetables', 3.2, null, 'Fresh Farms'], ['Kipdij', 'Chicken thigh', 'Meat', 8.9, null, 'Butcher Jansen'], ['Desembrood', 'Sourdough bread', 'Bread & bakery', 4.5, null, ''],
     ] }]), 'wastelog-products-template.xlsx');
 
     const parsed = () => {
-      const existing = new Set(state.meta.products.map((p) => norm(p.name)));
+      const existing = new Set(state.meta.products.map((p) => norm(p.name_nl || p.name)));
       const seen = new Set();
       const defCat = Number(card.querySelector('#imp-defcat')?.value) || other.id;
       return rows.map((r) => {
@@ -100,6 +101,7 @@ export async function openProductImport(onDone) {
         const catId = matchCategory(map.category !== undefined ? r[map.category] : null, name);
         const out = {
           name, waste_category_id: catId || defCat, guessed: !catId,
+          name_en: map.name_en !== undefined && r[map.name_en] != null ? String(r[map.name_en]).trim() : '',
           purchase_price_per_kg: map.price !== undefined ? toNumber(r[map.price]) : null,
           sales_price_per_kg: map.sales !== undefined ? toNumber(r[map.sales]) : null,
           supplier: map.supplier !== undefined && r[map.supplier] != null ? String(r[map.supplier]).trim() : '',
