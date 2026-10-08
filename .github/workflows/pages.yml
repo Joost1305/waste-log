@@ -25,6 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Browsers (and phone home-screen apps) cache the JavaScript files. Give every file a version
+      # tag per deploy so a new version is always loaded instead of an old cached one.
+      - name: Version tag on scripts and styles
+        run: |
+          v=${GITHUB_SHA::8}
+          find web/js -name '*.js' -exec sed -i -E "s#(from '\.{1,2}/[^']+\.js)'#\1?v=$v'#g; s#(import\('\.{1,2}/[^']+\.js)'\)#\1?v=$v')#g" {} +
+          sed -i -E "s#(src=\"(js/app\.js|vendor/[^\"]+\.js))\"#\1?v=$v\"#g; s#(href=\"css/app\.css)\"#\1?v=$v\"#" web/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
