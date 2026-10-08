@@ -257,3 +257,4 @@ td.actions { white-space: nowrap; text-align: right; }
 
 .photo-tiles .tile { border-color: var(--primary); }
 .photo-tiles .tile:not(.on) { background: var(--primary-soft); }
+#what-search.has-choice { font-weight: 700; color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }

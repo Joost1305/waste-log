@@ -234,10 +234,14 @@ function renderWhat() {
   if (photoTiles.length) tiles = tiles.filter((p) => !photoTiles.includes(p)).slice(0, 8);
   const tileHtml = (p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
       ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`;
+  // The chosen product's name appears in the search line; typing there starts a new search
+  const choiceName = selected ? selected.name : (s.productName || '');
+  const showChoice = !s.search && Boolean(choiceName);
   el.className = `step ${done ? 'done' : ''}`;
   el.innerHTML = `
     <div class="step-title"><span class="step-num">2</span>${t('reg_what')}</div>
-    <div class="field"><input type="search" id="what-search" placeholder="${t('reg_search')}" value="${esc(s.search)}" autocomplete="off"></div>
+    <div class="field"><input type="search" id="what-search" class="${showChoice ? 'has-choice' : ''}" placeholder="${t('reg_search')}"
+      value="${esc(showChoice ? choiceName : s.search)}" autocomplete="off"></div>
     ${photoTiles.length ? `<div class="small muted" style="margin:-4px 0 8px">&#128247; ${t('reg_photo_matches')}</div>
       <div class="tiles photo-tiles">${photoTiles.map(tileHtml).join('')}</div>
       <div style="height:14px"></div>` : ''}
@@ -251,7 +255,14 @@ function renderWhat() {
     ${done ? `<div class="selected-line">${t('reg_selected')}: <strong>${esc(selected ? selected.name : (s.productName || ''))}</strong>
       ${selected || s.productName ? ' · ' : ''}${esc(catLabel(selected ? selected.waste_category_id : s.categoryId))}</div>` : ''}`;
   const search = $('#what-search');
-  search.oninput = () => { s.search = search.value; const pos = search.selectionStart; renderWhat(); const n = $('#what-search'); n.focus(); n.setSelectionRange(pos, pos); };
+  // Tapping the line while it shows the chosen product selects the text, so typing replaces it
+  search.onfocus = () => { if (search.classList.contains('has-choice')) search.select(); };
+  search.oninput = () => {
+    s.search = search.value;
+    // Emptying the line clears the choice
+    if (!search.value && (s.productId || s.productName)) { s.productId = null; s.productName = ''; s.categoryId = null; updateSave(); renderPhoto(); }
+    const pos = search.selectionStart; renderWhat(); const n = $('#what-search'); n.focus(); n.setSelectionRange(pos, pos);
+  };
   $$('[data-p]', el).forEach((b) => (b.onclick = () => {
     const id = Number(b.dataset.p);
     if (s.productId === id) { s.productId = null; s.categoryId = null; }
