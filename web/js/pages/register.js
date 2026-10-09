@@ -91,6 +91,7 @@ function renderPhoto() {
     const applied = s.productId === sg.product_id && s.categoryId === sg.waste_category_id && (sg.product_id || s.productName === sg.product_name);
     ai = `<div class="ai-card"><div class="small muted">${t('reg_ai_suggest')}</div>
       <strong>${esc((state.meta.products.find((x) => x.id === sg.product_id) || {}).name || sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
+      ${sg.reason_id ? `<div class="small" style="margin-top:4px">${sg.is_plated_meal ? '&#127869; ' : ''}${t('reason')}: <strong>${esc((state.meta.waste_reasons.find((r) => r.id === sg.reason_id) || {}).label || '')}</strong></div>` : ''}
       ${applied ? '' : `<div style="margin-top:6px"><button type="button" class="btn-sm btn-primary" id="ai-use">${t('reg_ai_use')}</button></div>`}
       <div class="ai-note">${t('reg_ai_note')}</div></div>`;
   } else ai = `<div class="ai-card off">${p.ai === 'off' ? t('reg_ai_off') : t('reg_ai_fail')}</div>`;
@@ -106,10 +107,12 @@ function applySuggestion(sg) {
   s.productId = sg.product_id || null;
   s.productName = sg.product_id ? '' : sg.product_name;
   s.categoryId = sg.waste_category_id || null;
+  // The AI's reason (e.g. plate waste when it sees a served plate), unless the user already picked one
+  if (sg.reason_id && !s.reasonId && state.meta.waste_reasons.some((r) => r.id === sg.reason_id)) s.reasonId = sg.reason_id;
   applyWeight(sg);
   const prod = state.meta.products.find((x) => x.id === s.productId);
   if (prod && prod.default_supplier_id) s.supplierId = prod.default_supplier_id;
-  renderPhoto(); renderWhat(); renderWeight(); renderMore(); updateSave();
+  renderPhoto(); renderWhat(); renderWeight(); renderReason(); renderMore(); updateSave();
 }
 
 // Fill the weight from the AI (read from a scale display, or estimated) unless the user typed one.

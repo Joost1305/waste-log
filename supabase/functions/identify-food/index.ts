@@ -83,11 +83,13 @@ Deno.serve(async (req) => {
   const mime = file.type && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
 
   const since = new Date(Date.now() - 90 * 86400000).toISOString();
-  const [{ data: cats }, { data: recent }] = await Promise.all([
+  const [{ data: cats }, { data: recent }, { data: rsns }] = await Promise.all([
     sb.from('waste_categories').select('id, code').or(`organization_id.is.null,organization_id.eq.${orgId}`).eq('is_active', true),
     sb.from('waste_records').select('product_id').eq('organization_id', orgId).not('product_id', 'is', null)
       .is('deleted_at', null).gte('recorded_at', since).limit(5000),
+    sb.from('waste_reasons').select('id, code').or(`organization_id.is.null,organization_id.eq.${orgId}`).eq('is_active', true),
   ]);
+  const reasons = rsns || [];
   // All active products (paged: Supabase returns at most 1000 rows per request), used to match the AI's answer
   const products: Product[] = [];
   for (let from = 0; from < 20000; from += 1000) {
@@ -104,25 +106,50 @@ Deno.serve(async (req) => {
     .sort((a, b) => Number(b.is_quick_pick) - Number(a.is_quick_pick) || (uses.get(b.id) || 0) - (uses.get(a.id) || 0)).slice(0, 250);
 
   const prompt = [
-    'You help a professional kitchen register food waste. Look at the photo and identify the main food that is being thrown away.',
+    'You help a professional kitchen register food waste. Look at the photo and identify the food that is being thrown away.',
     `Choose category_code from exactly this list: ${categories.map((c) => c.code).join(', ')}.`,
     promptProducts.length ? `If it clearly matches one of the kitchen's most used products, use that product name: ${promptProducts.map((p) => p.name).join('; ')}.` : 'Name the product in plain words.',
-    'Write the product name the way a Dutch professional kitchen lists it (in Dutch, e.g. "Tomaten", "Kipdijfilet", "Stokbrood"), so it can be matched to the kitchen\'s product list.',
+    'Write product the way a Dutch professional kitchen lists it (in Dutch, e.g. "Tomaten", "Kipdijfilet", "Stokbrood"); product_en is the same in plain English. Keep both short: at most 6 words.',
+    'Served plate: if the food sits on a served plate or in a serving dish (a plated meal or leftovers from a guest), set is_plated_meal to true.',
+    'For a plated meal with several components, use category_code "prepared", name the dish briefly (e.g. "Visgerecht met puree en groente" / "Fish dish with mash and vegetables") and list the main components in components_en.',
+    `reason_code: the most likely reason, from exactly this list: ${reasons.map((r) => r.code).join(', ')}. A served plate with leftovers is "plate". Use null if you cannot tell.`,
     'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
-    'Otherwise estimate the weight of the wasted food in kg from its size, the container and any reference objects, and set weight_source to "estimate".',
+    'Otherwise estimate the weight of the wasted food in kg (not the plate or container) from its size and any reference objects, and set weight_source to "estimate".',
     'Only use null for suggested_weight_kg if there is no visible food at all.',
     'confidence is your honest probability (0-1) that product and category are right.',
-    'Also give product_en: the same product in plain English (e.g. "Tomatoes").',
-    'Answer with ONLY a JSON object: {"product": string, "product_en": string, "category_code": string, "subcategory": string|null, "confidence": number, "suggested_weight_kg": number|null, "weight_source": "scale"|"estimate"|null}',
+    'Answer by calling the register_waste tool.',
   ].join('\n');
+
+  // Structured output via a forced tool call: the answer is always valid JSON, never prose or a cut-off object
+  const tool = {
+    name: 'register_waste',
+    description: 'Register the food waste seen in the photo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        product: { type: 'string', description: 'Short Dutch kitchen name' },
+        product_en: { type: 'string', description: 'Short English name' },
+        category_code: { type: 'string', enum: categories.map((c) => c.code) },
+        subcategory: { type: ['string', 'null'] },
+        is_plated_meal: { type: 'boolean' },
+        components_en: { type: 'array', items: { type: 'string' } },
+        reason_code: { type: ['string', 'null'], enum: [...reasons.map((r) => r.code), null] },
+        confidence: { type: 'number' },
+        suggested_weight_kg: { type: ['number', 'null'] },
+        weight_source: { type: ['string', 'null'], enum: ['scale', 'estimate', null] },
+      },
+      required: ['product', 'product_en', 'category_code', 'is_plated_meal', 'reason_code', 'confidence', 'suggested_weight_kg', 'weight_source'],
+    },
+  };
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: MODEL, max_tokens: 300,
+        model: MODEL, max_tokens: 800,
+        tools: [tool], tool_choice: { type: 'tool', name: 'register_waste' },
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: mime, data: toBase64(await file.arrayBuffer()) } },
           { type: 'text', text: prompt },
@@ -135,24 +162,43 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: { ok: false, available: true, error: `AI provider HTTP ${res.status}` } });
     }
     const out = await res.json();
-    const text = (out.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) { console.error('identify-food: no JSON in AI answer', text.slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
-    const s = JSON.parse(m[0]);
+    let s: any = (out.content || []).find((c: any) => c.type === 'tool_use')?.input;
+    if (!s) {
+      // fallback: a JSON object somewhere in a text answer
+      const text = (out.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
+      const m = text.match(/\{[\s\S]*\}/);
+      try { s = m ? JSON.parse(m[0]) : null; } catch { s = null; }
+      if (!s) { console.error('identify-food: no structured answer', text.slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
+    }
+    if (typeof s.product === 'string') s.product = s.product.slice(0, 80);
+    if (typeof s.product_en === 'string') s.product_en = s.product_en.slice(0, 80);
+    if (typeof s.confidence === 'string') s.confidence = Number(s.confidence);
+    if (typeof s.suggested_weight_kg === 'string') s.suggested_weight_kg = Number(s.suggested_weight_kg.replace(',', '.')) || null;
     // Validate
-    const valid = typeof s.product === 'string' && s.product.length > 0 && s.product.length <= 80 &&
+    const valid = typeof s.product === 'string' && s.product.length > 0 &&
       typeof s.category_code === 'string' && typeof s.confidence === 'number' && s.confidence >= 0 && s.confidence <= 1 &&
       (s.suggested_weight_kg == null || (typeof s.suggested_weight_kg === 'number' && s.suggested_weight_kg > 0 && s.suggested_weight_kg <= 200)) &&
       (s.weight_source == null || s.weight_source === 'scale' || s.weight_source === 'estimate');
-    if (!valid) { console.error('identify-food: AI answer failed validation', m[0].slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
+    if (!valid) { console.error('identify-food: AI answer failed validation', JSON.stringify(s).slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
+    const plated = s.is_plated_meal === true;
+    const reason = reasons.find((r) => r.code === s.reason_code) || (plated ? reasons.find((r) => r.code === 'plate') : null) || null;
     const cat = categories.find((c) => c.code === s.category_code) || null;
-    const ranked = rankProducts([s.product, typeof s.product_en === 'string' ? s.product_en.slice(0, 80) : ''], products, uses);
-    const product = ranked.length ? ranked[0].p : null;
+    const comps: string[] = Array.isArray(s.components_en) ? s.components_en.filter((x: unknown) => typeof x === 'string').slice(0, 6) : [];
+    // A plated meal is registered as one dish (prepared food); its components are offered as tiles
+    const ranked = plated
+      ? comps.flatMap((c) => rankProducts([c], products, uses).slice(0, 1)).filter((r, i, a) => a.findIndex((x) => x.p.id === r.p.id) === i)
+      : rankProducts([s.product, s.product_en || ''], products, uses);
+    const product = plated ? null : (ranked.length ? ranked[0].p : null);
     return json({ ok: true, data: { ok: true, available: true, suggestion: {
       product_text: s.product,
       product_id: product ? product.id : null,
-      product_name: product ? product.name : s.product,
-      waste_category_id: product?.waste_category_id ?? cat?.id ?? null,
+      product_name: product ? product.name : (body.lang === 'en' && s.product_en ? s.product_en : s.product),
+      waste_category_id: plated ? (cat?.id ?? null) : (product?.waste_category_id ?? cat?.id ?? null),
+      product_name_en: typeof s.product_en === 'string' ? s.product_en : null,
+      is_plated_meal: plated,
+      components: comps,
+      reason_id: reason?.id ?? null,
+      reason_code: reason?.code ?? null,
       category_code: cat?.code ?? null,
       subcategory: typeof s.subcategory === 'string' ? s.subcategory.slice(0, 80) : null,
       confidence: Math.round(s.confidence * 100) / 100,
