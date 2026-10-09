@@ -104,7 +104,7 @@ function renderRestaurant() {
 // ------------------------------------------------------------------ photo + AI
 function renderPhoto() {
   const el = $('#sec-photo');
-  const head = `<div class="step-title"><span class="step-num">1</span>${t('reg_photo')} <span class="muted small">(${t('reg_photo_optional')})</span></div>`;
+  const head = `<div class="step-title"><span class="step-num">1</span>${t('reg_photo')}</div>`;
   if (!s.photo) {
     el.className = 'step';
     el.innerHTML = `${head}
