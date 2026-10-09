@@ -55,6 +55,18 @@ function rankProducts(names: string[], products: Product[], uses: Map<number, nu
   return scored.slice(0, 6);
 }
 
+// Read the fields from a text answer that is not valid JSON (for example cut off halfway)
+function salvage(text: string) {
+  const str = (k: string) => { const m = new RegExp(`"${k}"\\s*:\\s*"([^"]{1,120})"`).exec(text); return m ? m[1] : null; };
+  const num = (k: string) => { const m = new RegExp(`"${k}"\\s*:\\s*([0-9.]+)`).exec(text); return m ? Number(m[1]) : null; };
+  const bool = (k: string) => { const m = new RegExp(`"${k}"\\s*:\\s*(true|false)`).exec(text); return m ? m[1] === 'true' : null; };
+  const product = str('product');
+  const category_code = str('category_code');
+  if (!product || !category_code) return null;
+  return { product, product_en: str('product_en'), category_code, is_plated_meal: bool('is_plated_meal'), reason_code: str('reason_code'),
+    confidence: num('confidence') ?? 0.5, suggested_weight_kg: num('suggested_weight_kg'), weight_source: str('weight_source') };
+}
+
 function toBase64(buf: ArrayBuffer) {
   let s = ''; const b = new Uint8Array(buf);
   for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
@@ -120,7 +132,8 @@ Deno.serve(async (req) => {
     'Answer by calling the register_waste tool.',
   ].join('\n');
 
-  // Structured output via a forced tool call: the answer is always valid JSON, never prose or a cut-off object
+  // Structured output via a tool call (this model does not allow forcing it, so the prompt asks for it and
+  // a text answer is still read as a fallback, including a cut-off one)
   const tool = {
     name: 'register_waste',
     description: 'Register the food waste seen in the photo.',
@@ -149,7 +162,7 @@ Deno.serve(async (req) => {
       headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: MODEL, max_tokens: 800,
-        tools: [tool], tool_choice: { type: 'tool', name: 'register_waste' },
+        tools: [tool], tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: mime, data: toBase64(await file.arrayBuffer()) } },
           { type: 'text', text: prompt },
@@ -168,6 +181,7 @@ Deno.serve(async (req) => {
       const text = (out.content || []).filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n');
       const m = text.match(/\{[\s\S]*\}/);
       try { s = m ? JSON.parse(m[0]) : null; } catch { s = null; }
+      if (!s) s = salvage(text);
       if (!s) { console.error('identify-food: no structured answer', text.slice(0, 200)); return json({ ok: true, data: { ok: false, available: true, error: 'invalid_ai_output' } }); }
     }
     if (typeof s.product === 'string') s.product = s.product.slice(0, 80);
