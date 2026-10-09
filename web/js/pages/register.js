@@ -409,8 +409,23 @@ function updateSave() {
   const w = weightNumber();
   b.disabled = m.length > 0 || s.saving || (s.photo && s.photo.uploading);
   b.innerHTML = s.saving ? `<span class="spinner"></span>` : m.length
-    ? `${t('reg_missing')}: ${m.join(', ').toLowerCase()}`
+    ? t('reg_save')
     : `${t('reg_save')} · ${fmt.kg(s.unit === 'g' ? w / 1000 : w, 2)}`;
+  // The bar only sticks to the bottom once everything is filled in; until then the next open step is highlighted.
+  const bar = b.closest('.sticky-save');
+  if (bar) bar.classList.toggle('ready', !m.length);
+  markNextStep();
+}
+
+function markNextStep() {
+  const steps = [
+    [$('#sec-restaurant .reg-sections'), !(sectionsOf(s.restaurantId).length && !s.sectionId)],
+    [$('#sec-what'), !!(s.productId || s.categoryId)],
+    [$('#sec-weight'), weightNumber() > 0],
+    [$('#sec-reason'), !!s.reasonId],
+  ].filter(([el]) => el);
+  const next = steps.find(([, ok]) => !ok);
+  steps.forEach(([el]) => el.classList.toggle('next', !!next && el === next[0]));
 }
 
 async function save() {
