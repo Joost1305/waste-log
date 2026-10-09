@@ -8,6 +8,18 @@ const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_r
 // Leaderboard (switch in Settings): sections of a restaurant and the prevention question after saving
 const lbOn = () => !!(state.meta.organization && state.meta.organization.leaderboard_enabled);
 const sectionsOf = (rid) => (lbOn() ? (state.meta.sections || []).filter((x) => x.restaurant_id === rid) : []);
+// Read the switch fresh: a phone that has been open for days follows the setting without reloading
+async function refreshLeaderboardFlag() {
+  try {
+    const on = (await api('/leaderboard-enabled')).data;
+    if (state.meta.organization && state.meta.organization.leaderboard_enabled !== on) {
+      state.meta.organization.leaderboard_enabled = on;
+      if (!on) s.sectionId = null; else s.sectionId = savedSection(s.restaurantId);
+      if ($('#sec-restaurant')) { renderRestaurant(); updateSave(); }
+    }
+    return on;
+  } catch { return lbOn(); }
+}
 function savedSection(rid) {
   let v = null;
   try { v = Number(localStorage.getItem(LS.section + rid)) || null; } catch { /* private mode */ }
@@ -59,6 +71,7 @@ export async function renderRegister() {
   $('#reg').onsubmit = (e) => { e.preventDefault(); save(); };
   renderAll();
   loadToday();
+  refreshLeaderboardFlag();
 }
 
 function renderAll() {
@@ -441,7 +454,7 @@ async function save() {
     renderAll();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     loadToday(); loadTop(true);
-    if (lbOn()) askPrevention(rec);
+    if (lbOn() && await refreshLeaderboardFlag()) askPrevention(rec);
   } catch (e) {
     s.saving = false; updateSave(); toastError(e);
   }

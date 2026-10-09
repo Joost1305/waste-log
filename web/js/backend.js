@@ -141,7 +141,7 @@ route('GET', '/audit', async ({ query }) => {
 // catalog: suppliers, products, menu items, targets
 const catalog = {
   suppliers: { table: 'suppliers', select: '*', fields: ['name', 'contact'] },
-  products: { table: 'products', select: '*, suppliers(name)', fields: ['name', 'name_en', 'waste_category_id', 'category_id', 'default_supplier_id', 'purchase_price_per_kg', 'sales_price_per_kg', 'is_quick_pick', 'is_active'] },
+  products: { table: 'products', select: '*, suppliers(name)', fields: ['name', 'name_en', 'waste_category_id', 'category_id', 'default_supplier_id', 'purchase_price_per_kg', 'price_estimated', 'sales_price_per_kg', 'co2e_per_kg', 'co2e_source', 'is_quick_pick', 'is_active'] },
   'menu-items': { table: 'menu_items', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'portion_size_g', 'sales_price', 'cost_price', 'is_active'] },
   targets: { table: 'targets', select: '*, restaurants(name)', fields: ['name', 'restaurant_id', 'period', 'baseline_kg', 'target_kg', 'start_date', 'end_date'] },
 };
@@ -166,6 +166,11 @@ for (const [path, c] of Object.entries(catalog)) {
   route('PATCH', `/${path}/:id`, async ({ p, body }) => check(await sb.from(c.table).update(pick(body, c.fields)).eq('id', p.id).select(), true)[0]);
   route('DELETE', `/${path}/:id`, async ({ p }) => softDelete(c.table, p.id));
 }
+
+// Missing products: names typed in (or taken from the AI) that are not in the list yet
+route('GET', '/products-missing', async ({ query }) => check(await sb.rpc('missing_products', { p_org: ctx.orgId, p_days: num(query.days) || 90 })));
+route('POST', '/products-missing/link', async ({ body }) =>
+  ({ linked: check(await sb.rpc('link_missing_product', { p_product: Number(body.product_id), p_name: body.name, p_org: ctx.orgId })) }));
 
 // Product import from Excel: create missing suppliers, add new products, optionally update existing ones.
 route('POST', '/products/import', async ({ body }) => {
@@ -342,6 +347,11 @@ route('DELETE', '/report-subscriptions/:id', async ({ p }) => softDelete('report
 route('POST', '/report-subscriptions/:id/preview', async ({ p }) => invoke('weekly-report', { action: 'preview', id: Number(p.id) }));
 route('POST', '/report-subscriptions/:id/send', async ({ p, body }) => invoke('weekly-report', { action: 'send', id: Number(p.id), to: body.to }));
 
+// current state of the leaderboard switch (read fresh, so an open page follows the setting at once)
+route('GET', '/leaderboard-enabled', async () => {
+  const rows = check(await sb.from('organizations').select('leaderboard_enabled').eq('id', ctx.orgId).limit(1));
+  return !!(rows[0] && rows[0].leaderboard_enabled);
+});
 // leaderboard between sections (switch in Settings › Leaderboard)
 route('GET', '/leaderboard', async ({ query }) => check(await sb.rpc('leaderboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang })));

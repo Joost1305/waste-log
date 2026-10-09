@@ -98,7 +98,13 @@ test('valuation: invoice price > product price > organization default; grams sto
     const [c] = await q(...insertWaste({ restaurant_id: ID.ams, product_name: 'Mixed buffet', waste_category_id: ID.prepared, reason_id: ID.spoilage, weight_kg: 2 }));
     assert.equal(c.valuation_method, 'default');
     assert.equal(Number(c.purchase_value), 13);
-    assert.equal(Number(c.co2e_kg), 8);
+    assert.equal(Number(c.co2e_kg), 4.5, 'category factor (RIVM median for prepared food: 2.25)');
+  });
+  // A product with its own RIVM factor uses that factor
+  await db.query(`update products set co2e_per_kg = 0.83 where id = $1`, [ID.tomato]);
+  await as(db, U['student@hth'], async ({ q }) => {
+    const [t] = await q(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: ID.spoilage, weight_kg: 2 }));
+    assert.equal(Number(t.co2e_kg), 1.66);
   });
   await assert.rejects(as(db, U['student@hth'], ({ q }) => q(...insertWaste({ restaurant_id: ID.ams, reason_id: ID.spoilage, weight_kg: 1 }))), /Choose a product or a category/);
   await assert.rejects(as(db, U['student@hth'], ({ q }) => q(...insertWaste({ restaurant_id: ID.ams, waste_category_id: ID.prepared, reason_id: ID.spoilage, weight_kg: 900 }))));
@@ -452,4 +458,26 @@ test('leaderboard: switch, sections, prevention ideas, points and winners', asyn
   await as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set leaderboard_enabled = false where id = $1`, [ID.hth]));
   assert.equal((await as(db, U['student@hth'], async ({ one }) => (await one('select leaderboard() l')).l)).enabled, false);
   await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into prevention_ideas (waste_record_id, text) values ($1, 'Another idea')`, [rec.id])), /switched off/);
+});
+
+test('missing products: typed names show up, can be added and linked to past registrations', async () => {
+  for (let i = 0; i < 2; i++) {
+    await as(db, U['student@hth'], ({ q }) => q(...insertWaste({ restaurant_id: ID.ams, product_name: 'Spitskool', waste_category_id: ID.prepared, reason_id: ID.spoilage, weight_kg: 1.5 })));
+  }
+  const m = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select missing_products() m')).m);
+  const row = m.find((x) => x.name === 'Spitskool');
+  assert.ok(row && row.records === 2 && Number(row.kg) === 3);
+  assert.equal(row.waste_category_id, ID.prepared);
+  // Students cannot link; the manager adds the product and links the past registrations
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q('select link_missing_product(1, $1)', ['Spitskool'])), /Not allowed/);
+  const p = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(
+    `insert into products (name, waste_category_id, purchase_price_per_kg, co2e_per_kg) values ('Spitskool', $1, 2, 0.26) returning id`, [ID.prepared]));
+  const n = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select link_missing_product($1, $2) n', [p.id, 'spitskool'])).n);
+  assert.equal(n, 2);
+  const r = (await db.query(`select product_id, purchase_value, co2e_kg from waste_records where product_id = $1`, [p.id])).rows;
+  assert.equal(r.length, 2);
+  assert.equal(Number(r[0].purchase_value), 3);
+  assert.equal(Number(r[0].co2e_kg), 0.39);
+  const m2 = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select missing_products() m')).m);
+  assert.ok(!m2.some((x) => x.name === 'Spitskool'));
 });

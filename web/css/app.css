@@ -344,7 +344,7 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .lbs-add input { flex: 1; }
 .chip.muted { opacity: .6; }
 @media (max-width: 640px) { .lb-table th:nth-child(n+4), .lb-table td:nth-child(n+4) { display: none; }
-  .lb-podium { grid-template-columns: repeat(3, 1fr); gap: 6px; } .lb-pod { padding: 10px 4px; } .lb-points { font-size: 1.2rem; } .lb-name { font-size: .85rem; }
+  .lb-podium { grid-template-columns: repeat(3, 1fr); gap: 6px; } .lb-pod { padding: 10px 4px; } .lb-points { font-size: 1.2rem; } .lb-name { font-size: .85rem; } }
 /* Kitchen screen */
 .app.lb-screen { max-width: none; padding: 3vw 4vw; min-height: 100vh; background: var(--primary); color: #fff; }
 .lb-screen-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 2vw; flex-wrap: wrap; }
@@ -361,3 +361,12 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .lb-screen-idea span { opacity: .75; }
 .lb-screen-foot { margin-top: 2vw; font-size: 1vw; opacity: .7; }
 .lb-screen-foot a { color: #fff; }
+
+/* Missing products */
+.modal-card:has(.mp) { max-width: 820px; }
+.mp-rows { display: grid; gap: 0; margin-top: 8px; }
+.mp-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.mp-act { display: grid; gap: 6px; }
+.mp-line { display: flex; gap: 6px; flex-wrap: wrap; }
+.mp-line input, .mp-line select { flex: 1 1 140px; min-width: 0; }
+@media (max-width: 640px) { .mp-row { grid-template-columns: 1fr; } }

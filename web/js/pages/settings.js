@@ -4,6 +4,7 @@ import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModa
 import { t, LANGS } from '../i18n.js';
 import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
+import { openMissingProducts } from '../missing-products.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
 
@@ -16,13 +17,15 @@ function sections() {
   return [
     p.catalog && {
       key: 'products', title: t('set_products'), endpoint: '/products', canEdit: true, reloadMeta: true,
-      headerActions: [{ label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
+      headerActions: [{ label: `&#128269; ${t('mp_btn')}`, run: (reload) => openMissingProducts(reload) },
+        { label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
       columns: [
         [t('name'), (r) => `${esc(r.name)} ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}`],
         [t('name_en_col'), (r) => `<span class="muted">${esc(r.name_en || '')}</span>`],
         [t('category'), (r) => esc(labelOf(meta.waste_categories, r.waste_category_id))],
         [t('reg_supplier'), (r) => esc(r.supplier_name || '')],
-        [t('price_kg'), (r) => fmt.money(r.purchase_price_per_kg, 2), true],
+        [t('price_kg'), (r) => `${r.price_estimated ? `<span class="muted" title="${t('price_est_hint')}">≈ </span>` : ''}${fmt.money(r.purchase_price_per_kg, 2)}`, true],
+        [t('co2_col'), (r) => (r.co2e_per_kg != null ? `<span title="${esc(r.co2e_source || '')}">${fmt.num(r.co2e_per_kg, 2)}</span>` : `<span class="muted" title="${t('co2_cat_hint')}">${t('co2_cat_short')}</span>`), true],
         [t('quick_pick'), (r) => yes(r.is_quick_pick)],
       ],
       fields: () => [
@@ -32,7 +35,10 @@ function sections() {
         { name: 'category_id', label: t('subcategory'), type: 'select', options: meta.subcategories.map((c) => ({ value: c.id, label: `${labelOf(meta.waste_categories, c.waste_category_id)} › ${c.label}` })) },
         { name: 'default_supplier_id', label: t('default_supplier'), type: 'select', options: meta.suppliers.map((s) => ({ value: s.id, label: s.name })) },
         { name: 'purchase_price_per_kg', label: t('price_kg'), type: 'number', step: '0.01' },
+        { name: 'price_estimated', label: t('price_est_field'), type: 'checkbox' },
         { name: 'sales_price_per_kg', label: t('sales_kg'), type: 'number', step: '0.01' },
+        { name: 'co2e_per_kg', label: t('co2_field'), type: 'number', step: '0.01' },
+        { name: 'co2e_source', label: t('co2_src_field') },
         { name: 'is_quick_pick', label: t('quick_pick'), type: 'checkbox' },
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
