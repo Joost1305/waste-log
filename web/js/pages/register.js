@@ -108,9 +108,14 @@ function renderPhoto() {
   if (!s.photo) {
     el.className = 'step';
     el.innerHTML = `${head}
-      <label class="photo-btn btn" for="photo-input">&#128247;&nbsp; ${t('reg_photo_btn')}</label>
-      <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>`;
-    $('#photo-input').onchange = (e) => e.target.files[0] && handlePhoto(e.target.files[0]);
+      <div class="photo-btns">
+        <label class="photo-btn btn" for="photo-input">&#128247;&nbsp; ${t('reg_photo_take')}</label>
+        <label class="photo-btn btn" for="photo-pick">&#128444;&#65039;&nbsp; ${t('reg_photo_pick')}</label>
+      </div>
+      <input id="photo-input" type="file" accept="image/*" capture="environment" hidden>
+      <input id="photo-pick" type="file" accept="image/*" hidden>`;
+    // capture opens the camera straight away; the second input has no capture, so the phone offers the photo library
+    $$('#photo-input, #photo-pick', el).forEach((i) => (i.onchange = (e) => e.target.files[0] && handlePhoto(e.target.files[0])));
     return;
   }
   const p = s.photo;

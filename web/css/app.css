@@ -118,6 +118,8 @@ label { display: block; font-size: .85rem; font-weight: 600; color: var(--ink-2)
 .tile.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 .tile .sub { display: block; font-size: .72rem; font-weight: 500; opacity: .75; margin-top: 2px; }
 .photo-btn { width: 100%; min-height: 76px; border: 2px dashed var(--line); background: var(--surface-2); border-radius: var(--radius); font-size: 1.05rem; color: var(--ink-2); }
+.photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.photo-btns .photo-btn { min-height: 68px; font-size: 1rem; }
 .photo-row { display: flex; gap: 12px; align-items: center; }
 .photo-row img { width: 84px; height: 84px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .ai-card { flex: 1; background: var(--primary-soft); border-radius: var(--radius-sm); padding: 10px 12px; font-size: .92rem; }
