@@ -11,12 +11,14 @@ import { renderSettings } from './pages/settings.js';
 import { renderProfile } from './pages/profile.js';
 import { renderSetPassword } from './pages/set-password.js';
 import { renderImpact } from './pages/impact.js';
+import { renderInterventions } from './pages/interventions.js';
 
 const routes = [
   { path: 'register', render: renderRegister, nav: 'nav_register', show: () => true },
   { path: 'dashboard', render: renderDashboard, nav: 'nav_dashboard', show: (p) => p.dashboard },
   { path: 'records', render: renderRecords, nav: 'nav_records', show: () => true },
   { path: 'gallery', render: renderGallery, nav: 'nav_gallery', show: () => true },
+  { path: 'interventions', render: renderInterventions, nav: 'nav_interventions', show: () => true },
   { path: 'settings', render: renderSettings, nav: 'nav_settings', show: (p) => p.catalog || p.users },
   { path: 'profile', render: renderProfile, nav: 'nav_profile', show: () => true },
 ];

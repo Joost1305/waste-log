@@ -296,3 +296,53 @@ test('public impact page: anonymous visitors see only enabled restaurants, no pr
   assert.equal(nope, null);
   await assert.rejects(as(db, null, ({ q }) => q('select * from waste_records limit 1')));
 });
+
+test('interventions: own restaurants only, before/after effect with comparison group', async () => {
+  const start = (await db.query(`select (current_date - 21)::text d`)).rows[0].d;
+  // Amsterdam manager may add one for Amsterdam, not for The Hague
+  const iv = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(
+    `insert into interventions (restaurant_id, title, start_date, status, scope_reason_id) values ($1, 'Smaller batches', $2, 'active', $3) returning *`,
+    [ID.ams, start, ID.spoilage]));
+  assert.equal(iv.organization_id, ID.hth);
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(
+    `insert into interventions (restaurant_id, title, start_date) values ($1, 'Not mine', current_date)`, [ID.hague])));
+  // Effect: same number of days before and after, comparison with the other restaurants
+  const e = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select intervention_effect($1, 28) e', [iv.id])).e);
+  assert.equal(e.status, 'ok');
+  assert.equal(e.before.days, 28);
+  assert.equal(e.after.days, 22);
+  assert.ok(e.control_restaurants >= 1);
+  assert.ok(Array.isArray(e.weekly) && e.weekly.some((w) => w.phase === 'before') && e.weekly.some((w) => w.phase === 'after'));
+  const s = (await db.query(`select coalesce(sum(weight_kg), 0) kg from waste_records where restaurant_id = $1 and reason_id = $2 and deleted_at is null
+     and app.local_date(recorded_at) between $3::date - 28 and $3::date - 1`, [ID.ams, ID.spoilage, start])).rows[0];
+  assert.ok(Math.abs(e.before.kg - Number(s.kg)) < 0.05);
+  // List with effect summary; students see no interventions
+  const l = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select interventions_list(null, 'en') l`)).l);
+  const mine = l.find((x) => x.id === iv.id);
+  assert.ok(mine && mine.effect.status === 'ok' && mine.effect.weekly === null && mine.scope_reason === 'Spoilage');
+  const st = await as(db, U['student@hth'], async ({ one }) => (await one(`select interventions_list() l`)).l);
+  assert.deepEqual(st, []);
+  // Other organization sees nothing and gets no effect
+  const other = await as(db, U['admin@bistro'], async ({ one }) => (await one('select intervention_effect($1) e', [iv.id])).e);
+  assert.equal(other, null);
+});
+
+test('best practices: managers publish for their restaurant, everyone in the organization reads published ones', async () => {
+  const bp = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(
+    `insert into best_practices (restaurant_id, title, problem, solution, status) values ($1, 'Soup in two batches', 'Soup left over', 'Cook half, then top up', 'published') returning *`, [ID.ams]));
+  assert.ok(bp.published_at && bp.author_user_id === U['manager.amsterdam@hth']);
+  const draft = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(
+    `insert into best_practices (restaurant_id, title, status) values ($1, 'Draft idea', 'draft') returning id`, [ID.ams]));
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(
+    `insert into best_practices (restaurant_id, title) values ($1, 'Not mine')`, [ID.hague])));
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(
+    `insert into best_practices (restaurant_id, title) values ($1, 'Student')`, [ID.ams])));
+  const st = await as(db, U['student@hth'], async ({ one }) => (await one(`select best_practices_list() l`)).l);
+  assert.ok(st.rows.some((r) => r.id === bp.id && r.author_name && r.can_edit === false));
+  assert.ok(!st.rows.some((r) => r.id === draft.id), 'students do not see drafts');
+  assert.ok(st.categories.length >= 8);
+  const hague = await as(db, U['manager.denhaag@hth'], async ({ one }) => (await one(`select best_practices_list() l`)).l);
+  assert.ok(hague.rows.find((r) => r.id === bp.id).can_edit === false, 'other restaurants can read, not edit');
+  const other = await as(db, U['admin@bistro'], async ({ one }) => (await one(`select best_practices_list() l`)).l);
+  assert.ok(!other.rows.some((r) => r.id === bp.id));
+});

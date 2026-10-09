@@ -299,10 +299,48 @@ route('GET', '/public-impact', async ({ query }) => check(await sb.rpc('public_i
   p_org_slug: query.org, p_restaurant_slug: query.restaurant || null, p_lang: ctx.lang })));
 route('GET', '/my-org-slug', async () => check(await sb.rpc('my_org_slug', { p_org: ctx.orgId })));
 
+// interventions: what a restaurant changed, and the before/after effect measured from the records
+const IV_FIELDS = ['restaurant_id', 'title', 'reason', 'description', 'type', 'start_date', 'end_date', 'status', 'responsible_label',
+  'expected_change_pct', 'scope_waste_category_id', 'scope_reason_id', 'scope_menu_item_id'];
+route('GET', '/interventions', async () => check(await sb.rpc('interventions_list', { p_org: ctx.orgId, p_lang: ctx.lang })));
+route('GET', '/interventions/:id/effect', async ({ p, query }) =>
+  check(await sb.rpc('intervention_effect', { p_id: Number(p.id), p_days: num(query.days) || 28 })));
+route('POST', '/interventions', async ({ body }) =>
+  check(await sb.from('interventions').insert({ ...pick(body, IV_FIELDS), organization_id: ctx.orgId }).select('id').single()));
+route('PATCH', '/interventions/:id', async ({ p, body }) =>
+  check(await sb.from('interventions').update(pick(body, IV_FIELDS)).eq('id', p.id).select('id'), true));
+route('DELETE', '/interventions/:id', async ({ p }) => softDelete('interventions', p.id));
+
+// best practices: a short story (problem, solution, result) with an optional photo or PDF
+const BP_FIELDS = ['restaurant_id', 'intervention_id', 'category_id', 'title', 'problem', 'solution', 'result', 'result_change_pct', 'status',
+  'attachment_path', 'attachment_name', 'attachment_type'];
+route('GET', '/best-practices', async () => check(await sb.rpc('best_practices_list', { p_org: ctx.orgId, p_lang: ctx.lang })));
+route('POST', '/best-practices', async ({ body }) =>
+  check(await sb.from('best_practices').insert({ ...pick(body, BP_FIELDS), organization_id: ctx.orgId }).select('id').single()));
+route('PATCH', '/best-practices/:id', async ({ p, body }) =>
+  check(await sb.from('best_practices').update(pick(body, BP_FIELDS)).eq('id', p.id).select('id'), true));
+route('DELETE', '/best-practices/:id', async ({ p }) => softDelete('best_practices', p.id));
+route('POST', '/documents', async ({ form }) => {
+  const file = form.get('file');
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `org-${ctx.orgId}/best-practices/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from('documents').upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new ApiError(400, /row-level security/i.test(error.message) ? 'No permission to upload for this organization'
+    : /mime|type/i.test(error.message) ? 'Only photos (JPG, PNG, WebP) and PDF files' : /size|large/i.test(error.message) ? 'File is larger than 10 MB' : error.message);
+  return { path, name: file.name, type: file.type };
+});
+
 // dashboard
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang,
 })));
+
+// Signed link to a best-practice attachment
+export async function documentUrl(path) {
+  const { data, error } = await sb.storage.from('documents').createSignedUrl(path, 600);
+  if (error) throw new ApiError(404, 'File not found');
+  return data.signedUrl;
+}
 
 // Signed, short-lived URL for a photo (storage policies decide who may see it)
 export async function photoUrl(path) {
