@@ -126,6 +126,9 @@ test('dashboard totals match the records and respect scope', async () => {
   assert.ok(Math.abs(d.by_category.reduce((a, c) => a + c.kg, 0) - Number(s.kg)) < 0.05);
   assert.ok(d.target && d.target.baseline_kg > d.target.target_kg);
   assert.ok(d.trend.length >= 5);
+  // Cost explanation: the euros per price source add up to the total waste cost
+  assert.ok(d.valuation_mix.every((v) => v.value != null));
+  assert.ok(Math.abs(d.valuation_mix.reduce((a, v) => a + Number(v.value), 0) - d.totals.value) < 0.05);
   // A manager who does not see every restaurant gets no organization-wide target
   const m = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select dashboard() d')).d);
   assert.equal(m.target, null);

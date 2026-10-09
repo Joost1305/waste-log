@@ -5,6 +5,7 @@ import { state, api, app, esc, fmt, toastError, todayIso, addDaysIso, $, $$, pri
 import { t } from '../i18n.js';
 import { exportDashboard } from '../export.js';
 import { showCo2Info } from '../co2.js';
+import { showCostInfo } from '../cost.js';
 
 const charts = [];
 let q; let last = null;
@@ -91,8 +92,9 @@ function draw(d) {
   body.innerHTML = `
     <div class="grid grid-kpi">
       <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div></div>
-      <div class="card kpi"><div class="label">${t('kpi_cost')}</div><div class="value">${fmt.money(T.value)}</div>
-        <div class="delta muted">${t('purchase_value')}</div></div>
+      <button type="button" class="card kpi kpi-link" id="kpi-cost" title="${t('cost_hint')}"><div class="label">${t('kpi_cost')} <span class="info-i" aria-hidden="true">i</span></div>
+        <div class="value">${fmt.money(T.value)}</div>
+        <div class="delta muted">${t('purchase_value')} · <span class="link-ish">${t('co2_short')}</span></div></button>
       <div class="card kpi"><div class="label">${t('kpi_per_guest')}</div><div class="value">${T.g_per_guest != null ? `${fmt.num(T.g_per_guest)} g` : '–'}</div>
         <div class="delta muted">${fmt.num(T.guests)} ${t('guests').toLowerCase()}</div></div>
       <button type="button" class="card kpi kpi-link" id="kpi-co2" title="${t('co2_hint')}"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
@@ -130,6 +132,7 @@ function draw(d) {
     </div>`;
 
   $('#kpi-co2').onclick = () => showCo2Info();
+  $('#kpi-cost').onclick = () => showCostInfo(d.valuation_mix, T.value, state.meta.organization.default_value_per_kg);
 
   const ink2 = css('--ink-2'); const line = css('--line'); const primary = css('--primary');
   const base = {
