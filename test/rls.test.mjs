@@ -385,3 +385,71 @@ test('weekly e-mail: recipients cleaned and checked, own restaurants only, repor
   const due2 = (await db.query('select weekly_reports_due() d')).rows[0].d;
   assert.ok(!due2.some((d) => d.subscription_id === s.id), 'sent once per week');
 });
+
+test('leaderboard: switch, sections, prevention ideas, points and winners', async () => {
+  // Off by default: nothing happens
+  const off = await as(db, U['student@hth'], async ({ one }) => (await one('select leaderboard() l')).l);
+  assert.equal(off.enabled, false);
+  const rec0 = await as(db, U['student@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, waste_category_id: ID.prepared, reason_id: ID.spoilage, weight_kg: 1 })));
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into prevention_ideas (waste_record_id, text) values ($1, 'Smaller pans')`, [rec0.id])), /switched off/);
+  // Managers cannot switch it on; the org admin can
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update organizations set leaderboard_enabled = true where id = $1`, [ID.hth]));
+  assert.equal((await db.query('select leaderboard_enabled from organizations where id = $1', [ID.hth])).rows[0].leaderboard_enabled, false);
+  await as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set leaderboard_enabled = true, leaderboard_prize = 'Lunch voucher' where id = $1`, [ID.hth]));
+  // Sections: managers for their own restaurants
+  const bakery = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(`insert into sections (restaurant_id, name) values ($1, 'Bakery') returning *`, [ID.ams]));
+  const salad = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(`insert into sections (restaurant_id, name) values ($1, 'Salad bar') returning *`, [ID.ams]));
+  assert.equal(bakery.organization_id, ID.hth);
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(`insert into sections (restaurant_id, name) values ($1, 'Pizza')`, [ID.hague])));
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into sections (restaurant_id, name) values ($1, 'Pizza')`, [ID.ams])));
+  const hagueSec = (await db.query(`insert into sections (restaurant_id, name) values ($1, 'Grill') returning id`, [ID.hague])).rows[0].id;
+  const meta = await as(db, U['student@hth'], async ({ one }) => (await one(`select app_meta(null, 'en') m`)).m);
+  assert.equal(meta.organization.leaderboard_enabled, true);
+  assert.deepEqual(meta.sections.map((s) => s.name).sort(), ['Bakery', 'Salad bar'], 'only sections of my restaurants');
+  // Register with a section; a section of another restaurant is refused
+  const rec = await as(db, U['student@hth'], ({ one }) => one(
+    `insert into waste_records (restaurant_id, section_id, waste_category_id, reason_id, weight_kg, entered_unit, user_id, photo_path)
+     values ($1, $2, $3, $4, 2, 'kg', auth.uid(), $5) returning *`, [ID.ams, bakery.id, ID.prepared, ID.spoilage, `org-${ID.hth}/x/photo.jpg`]));
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(
+    `insert into waste_records (restaurant_id, section_id, waste_category_id, reason_id, weight_kg, entered_unit, user_id) values ($1, $2, $3, $4, 1, 'kg', auth.uid())`,
+    [ID.ams, hagueSec, ID.prepared, ID.spoilage])), /does not belong/);
+  // Prevention idea: section and restaurant come from the registration
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into prevention_ideas (waste_record_id, text) values ($1, 'x')`, [rec.id])));
+  const idea = await as(db, U['student@hth'], ({ one }) => one(
+    `insert into prevention_ideas (waste_record_id, text) values ($1, '  Bake the second batch only after 11:00  ') returning *`, [rec.id]));
+  assert.equal(idea.section_id, bakery.id);
+  assert.equal(idea.text, 'Bake the second batch only after 11:00');
+  // Only the org admin adopts
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update prevention_ideas set status = 'adopted' where id = $1`, [idea.id]));
+  assert.equal((await db.query('select status from prevention_ideas where id = $1', [idea.id])).rows[0].status, 'new');
+  const ad = await as(db, U['orgadmin@hth'], ({ one }) => one(`update prevention_ideas set status = 'adopted', text = 'changed' where id = $1 returning *`, [idea.id]));
+  assert.equal(ad.status, 'adopted');
+  assert.equal(ad.text, 'Bake the second batch only after 11:00', 'text cannot be changed');
+  assert.ok(ad.reviewed_by && ad.reviewed_at);
+  // Points
+  const lb = await as(db, U['student@hth'], async ({ one }) => (await one(`select leaderboard(null, $1) l`, [ID.ams])).l);
+  assert.equal(lb.enabled, true);
+  assert.equal(lb.prize, 'Lunch voucher');
+  const b = lb.rows.find((r) => r.section_id === bakery.id);
+  assert.equal(b.presence, 10);
+  assert.equal(b.quality, 3, 'photo + weighed');
+  assert.equal(b.ideas, 30, '5 for the idea, 25 because it was adopted');
+  assert.equal(lb.rows[0].section_id, bakery.id);
+  assert.equal(lb.rows.find((r) => r.section_id === salad.id).points, 0);
+  assert.equal(lb.idea_of_period.section, 'Bakery');
+  // Idea list: the student sees own and adopted ideas, never names of others
+  const list = await as(db, U['student@hth'], async ({ one }) => (await one(`select prevention_ideas_list() l`)).l);
+  assert.ok(list.some((i) => i.id === idea.id && i.mine));
+  // Winners: org admin only
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(
+    `insert into leaderboard_awards (restaurant_id, section_id, period_from, period_to) values ($1, $2, current_date - 7, current_date - 1)`, [ID.ams, bakery.id])));
+  const aw = await as(db, U['orgadmin@hth'], ({ one }) => one(
+    `insert into leaderboard_awards (restaurant_id, section_id, period_from, period_to, points, prize) values ($1, $2, current_date - 7, current_date - 1, 43, 'Lunch voucher') returning *`, [ID.ams, bakery.id]));
+  assert.equal(aw.organization_id, ID.hth);
+  const lb2 = await as(db, U['student@hth'], async ({ one }) => (await one(`select leaderboard(null, $1) l`, [ID.ams])).l);
+  assert.equal(lb2.awards[0].section, 'Bakery');
+  // Switched off again: no page, no ideas
+  await as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set leaderboard_enabled = false where id = $1`, [ID.hth]));
+  assert.equal((await as(db, U['student@hth'], async ({ one }) => (await one('select leaderboard() l')).l)).enabled, false);
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into prevention_ideas (waste_record_id, text) values ($1, 'Another idea')`, [rec.id])), /switched off/);
+});

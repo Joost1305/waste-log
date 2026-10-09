@@ -311,3 +311,53 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 /* Weekly e-mail preview */
 .modal-card:has(.wk-preview) { max-width: 760px; }
 .wk-frame { width: 100%; height: 60vh; border: 1px solid var(--line); border-radius: 10px; margin-top: 12px; background: #F4F2EC; }
+
+/* Leaderboard */
+.reg-sections { margin-top: 10px; }
+.reg-sections .small { margin: 0 2px 6px; }
+.reg-sections.need .chips { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 12px; }
+.lb-prize { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.lb-prize > div:nth-child(2) { flex: 1; min-width: 200px; }
+.lb-trophy { font-size: 2.2rem; }
+.lb-prize-text { font-weight: 700; font-size: 1.05rem; }
+.lb-podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; align-items: end; }
+.lb-pod { text-align: center; padding: 18px 10px; }
+.lb-pod-1 { order: 2; padding-top: 30px; border: 2px solid #E2B33C; }
+.lb-pod-2 { order: 1; } .lb-pod-3 { order: 3; }
+.lb-medal { font-size: 2rem; }
+.lb-name { font-weight: 700; margin-top: 4px; }
+.lb-points { font-size: 1.6rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.lb-points span { font-size: .8rem; color: var(--ink-2); font-weight: 600; }
+.lb-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--surface-2); margin-bottom: 4px; }
+.lb-seg { display: inline-block; height: 100%; }
+.lb-presence { background: var(--primary); } .lb-quality { background: #5E9C83; } .lb-ideas { background: #E2B33C; } .lb-improvement { background: var(--accent); }
+.lb-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+.lb-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.lb-idea-text { font-size: 1.15rem; font-weight: 600; margin-top: 4px; }
+.lb-idealist, .lb-hall { list-style: none; padding: 0; margin: 0; }
+.lb-idealist li, .lb-hall li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.lb-idea-actions { display: flex; gap: 6px; margin-top: 6px; }
+.lb-rules { margin: 10px 0 0; padding-left: 18px; } .lb-rules li { margin-bottom: 6px; }
+.lbs-rest { padding: 12px 0; border-top: 1px solid var(--line); }
+.lbs-rest h3 { margin: 0 0 8px; }
+.lbs-add { display: flex; gap: 8px; margin-top: 10px; max-width: 420px; }
+.lbs-add input { flex: 1; }
+.chip.muted { opacity: .6; }
+@media (max-width: 640px) { .lb-table th:nth-child(n+4), .lb-table td:nth-child(n+4) { display: none; }
+  .lb-podium { grid-template-columns: repeat(3, 1fr); gap: 6px; } .lb-pod { padding: 10px 4px; } .lb-points { font-size: 1.2rem; } .lb-name { font-size: .85rem; }
+/* Kitchen screen */
+.app.lb-screen { max-width: none; padding: 3vw 4vw; min-height: 100vh; background: var(--primary); color: #fff; }
+.lb-screen-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 2vw; flex-wrap: wrap; }
+.lb-screen-head h1 { font-size: 4vw; margin: 0; color: #fff; }
+.lb-kicker { font-size: 1.4vw; opacity: .8; letter-spacing: .06em; text-transform: uppercase; }
+.lb-screen-prize { font-size: 1.8vw; font-weight: 700; background: rgba(255,255,255,.12); padding: 1vw 1.6vw; border-radius: 14px; }
+.lb-screen-list { list-style: none; padding: 0; margin: 3vw 0 0; }
+.lb-screen-list li { display: grid; grid-template-columns: 5vw 22vw 1fr 8vw; align-items: center; gap: 2vw; font-size: 2.6vw; padding: 1vw 0; border-bottom: 1px solid rgba(255,255,255,.15); }
+.lb-sname { font-weight: 700; }
+.lb-sbar { height: 1.6vw; background: rgba(255,255,255,.15); border-radius: 99px; overflow: hidden; }
+.lb-sbar span { display: block; height: 100%; background: #E2B33C; }
+.lb-spts { text-align: right; font-weight: 750; font-variant-numeric: tabular-nums; }
+.lb-screen-idea { margin-top: 3vw; font-size: 1.9vw; background: rgba(255,255,255,.1); padding: 1.4vw 2vw; border-radius: 14px; }
+.lb-screen-idea span { opacity: .75; }
+.lb-screen-foot { margin-top: 2vw; font-size: 1vw; opacity: .7; }
+.lb-screen-foot a { color: #fff; }

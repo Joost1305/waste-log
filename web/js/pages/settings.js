@@ -128,6 +128,7 @@ function sections() {
       ],
     },
     p.dashboard && { key: 'weekly', title: t('set_weekly'), custom: renderWeekly },
+    p.dashboard && { key: 'leaderboard', title: t('set_leaderboard'), custom: renderLeaderboardSettings },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
     p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
@@ -226,6 +227,74 @@ async function renderOrg(el) {
     e.preventDefault();
     try { await api('/organization', { method: 'PATCH', body: readForm(el, fields) }); await loadMeta(); toast(t('org_saved')); } catch (err) { toastError(err); }
   };
+}
+
+// ------------------------------------------------------------------ leaderboard: switch, prize, sections
+async function renderLeaderboardSettings(el) {
+  const meta = state.meta; const p = meta.permissions;
+  let org = null; let secs = [];
+  try {
+    [org, secs] = await Promise.all([p.org_settings ? api('/organization').then((r) => r.data) : null, api('/sections').then((r) => r.data || [])]);
+  } catch (e) { toastError(e); return; }
+  const on = org ? org.leaderboard_enabled : !!meta.organization.leaderboard_enabled;
+  el.innerHTML = `
+    ${org ? `<form class="card" id="lb-form"><h2>${t('set_leaderboard')}</h2>
+      <p class="muted small">${t('lbs_sub')}</p>
+      <div class="field"><label class="check lb-switch"><input type="checkbox" name="leaderboard_enabled" ${on ? 'checked' : ''}> <strong>${t('lbs_on')}</strong></label>
+        <div class="small muted">${t('lbs_on_help')}</div></div>
+      <div class="field"><label>${t('lb_prize')}</label><input name="leaderboard_prize" value="${esc(org.leaderboard_prize || '')}" placeholder="${t('lbs_prize_ph')}"></div>
+      <div class="field-row">
+        <div class="field"><label>${t('lbs_period')}</label><select name="leaderboard_period">
+          ${['week', 'month'].map((x) => `<option value="${x}" ${org.leaderboard_period === x ? 'selected' : ''}>${t('lbs_period_' + x)}</option>`).join('')}</select></div>
+        <div class="field"><label>${t('lbs_season')}</label><input type="date" name="leaderboard_season_start" value="${esc(org.leaderboard_season_start || '')}"></div>
+      </div>
+      <button class="btn-primary" type="submit">${t('save')}</button></form>`
+    : `<div class="card"><h2>${t('set_leaderboard')}</h2><p class="small">${on ? t('lbs_is_on') : t('lbs_is_off')}</p></div>`}
+    <div class="card" style="margin-top:16px"><h2>${t('lbs_sections')}</h2><p class="muted small">${t('lbs_sections_help')}</p>
+      ${meta.restaurants.map((r) => {
+        const list = secs.filter((x) => x.restaurant_id === r.id);
+        return `<div class="lbs-rest"><h3>${esc(r.name)}</h3>
+          <div class="chips">${list.map((x) => `<button type="button" class="chip ${x.is_active ? '' : 'muted'}" data-sec="${x.id}">${esc(x.name)}${x.is_active ? '' : ` (${t('lbs_inactive')})`} &#9998;</button>`).join('') || `<span class="muted small">${t('lbs_none')}</span>`}</div>
+          <form class="lbs-add" data-rest="${r.id}"><input name="name" maxlength="60" placeholder="${t('lbs_add_ph')}"><button class="btn-sm" type="submit">+ ${t('add')}</button></form></div>`;
+      }).join('')}
+    </div>`;
+  const reload = async () => { await loadMeta(); renderLeaderboardSettings(el); };
+  if ($('#lb-form')) $('#lb-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const body = { leaderboard_enabled: f.leaderboard_enabled.checked, leaderboard_prize: f.leaderboard_prize.value.trim() || null,
+      leaderboard_period: f.leaderboard_period.value, leaderboard_season_start: f.leaderboard_season_start.value || null };
+    try {
+      await api('/organization', { method: 'PATCH', body });
+      await loadMeta(); toast(body.leaderboard_enabled ? t('lbs_saved_on') : t('lbs_saved_off'));
+      window.dispatchEvent(new HashChangeEvent('hashchange'));   // rebuild the menu
+    } catch (err) { toastError(err); }
+  };
+  $$('.lbs-add', el).forEach((f) => (f.onsubmit = async (e) => {
+    e.preventDefault();
+    const name = f.name.value.trim();
+    if (!name) return;
+    try { await api('/sections', { method: 'POST', body: { restaurant_id: Number(f.dataset.rest), name, sort_order: secs.length } }); toast(t('saved')); reload(); }
+    catch (err) { toastError(err); }
+  }));
+  $$('[data-sec]', el).forEach((b) => (b.onclick = () => {
+    const x = secs.find((y) => y.id === Number(b.dataset.sec));
+    const fields = [{ name: 'name', label: t('name'), required: true }, { name: 'sort_order', label: t('lbs_order'), type: 'number', step: '1' },
+      { name: 'is_active', label: t('active'), type: 'checkbox' }];
+    openModal(`<h2>${t('edit')}: ${esc(x.name)}</h2><form id="sec-form">${formHtml(fields, x)}
+      <div class="modal-actions"><button type="button" class="btn-ghost btn-danger" id="sec-del" style="margin-right:auto">${t('delete')}</button>
+      <button type="button" data-close>${t('cancel')}</button><button class="btn-primary">${t('save')}</button></div></form>`, (card, close) => {
+      card.querySelector('#sec-form').onsubmit = async (e) => {
+        e.preventDefault();
+        try { await api(`/sections/${x.id}`, { method: 'PATCH', body: readForm(card, fields) }); close(); toast(t('saved')); reload(); } catch (err) { toastError(err); }
+      };
+      card.querySelector('#sec-del').onclick = async () => {
+        close();
+        if (!(await confirmDialog(t('lbs_del_confirm', { n: x.name })))) return;
+        try { await api(`/sections/${x.id}`, { method: 'DELETE' }); reload(); } catch (err) { toastError(err); }
+      };
+    });
+  }));
 }
 
 // ------------------------------------------------------------------ weekly impact e-mail

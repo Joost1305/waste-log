@@ -1,9 +1,18 @@
 // Waste registration for kitchen staff. Target: done in about 10 seconds.
 // Photo -> (AI suggestion) -> what -> weight -> reason -> save. Everything else is optional.
-import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, confirmDialog } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, confirmDialog, openModal } from '../core.js';
 import { t } from '../i18n.js';
 
-const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent' };
+const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent', section: 'fw_reg_section_' };
+
+// Leaderboard (switch in Settings): sections of a restaurant and the prevention question after saving
+const lbOn = () => !!(state.meta.organization && state.meta.organization.leaderboard_enabled);
+const sectionsOf = (rid) => (lbOn() ? (state.meta.sections || []).filter((x) => x.restaurant_id === rid) : []);
+function savedSection(rid) {
+  let v = null;
+  try { v = Number(localStorage.getItem(LS.section + rid)) || null; } catch { /* private mode */ }
+  return sectionsOf(rid).some((x) => x.id === v) ? v : null;
+}
 
 let s; // page state
 
@@ -13,6 +22,7 @@ function freshState(keep = {}) {
   const restaurantId = keep.restaurantId || (meta.restaurants.some((r) => r.id === saved) ? saved : meta.restaurants[0]?.id);
   return {
     restaurantId,
+    sectionId: savedSection(restaurantId),
     unit: localStorage.getItem(LS.unit) || 'kg',
     photo: null, // { url, token, uploading, ai: 'thinking'|'done'|'off'|'fail', suggestion }
     productId: null, productName: '', categoryId: null, search: '',
@@ -60,13 +70,21 @@ function renderAll() {
 function renderRestaurant() {
   const list = state.meta.restaurants;
   const el = $('#sec-restaurant');
-  if (list.length < 2) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="chips">${list.map((r) =>
-    `<button type="button" class="chip ${r.id === s.restaurantId ? 'on' : ''}" data-r="${r.id}">${esc(r.name)}</button>`).join('')}</div>`;
+  const secs = sectionsOf(s.restaurantId);
+  el.innerHTML = (list.length > 1 ? `<div class="chips">${list.map((r) =>
+    `<button type="button" class="chip ${r.id === s.restaurantId ? 'on' : ''}" data-r="${r.id}">${esc(r.name)}</button>`).join('')}</div>` : '') +
+    (secs.length ? `<div class="reg-sections ${s.sectionId ? '' : 'need'}"><div class="small muted">${t('reg_section')}</div><div class="chips">${secs.map((x) =>
+      `<button type="button" class="chip ${x.id === s.sectionId ? 'on' : ''}" data-sec="${x.id}">${esc(x.name)}</button>`).join('')}</div></div>` : '');
   $$('[data-r]', el).forEach((b) => (b.onclick = () => {
     s.restaurantId = Number(b.dataset.r);
+    s.sectionId = savedSection(s.restaurantId);
     localStorage.setItem(LS.restaurant, String(s.restaurantId));
-    renderRestaurant(); renderMore(); renderWhat(); loadToday(); loadTop();
+    renderRestaurant(); renderMore(); renderWhat(); loadToday(); loadTop(); updateSave();
+  }));
+  $$('[data-sec]', el).forEach((b) => (b.onclick = () => {
+    s.sectionId = Number(b.dataset.sec);
+    try { localStorage.setItem(LS.section + s.restaurantId, String(s.sectionId)); } catch { /* private mode */ }
+    renderRestaurant(); updateSave();
   }));
 }
 
@@ -364,6 +382,7 @@ function weightNumber() { return Number(String(s.weight).replace(',', '.')); }
 
 function missing() {
   const m = [];
+  if (sectionsOf(s.restaurantId).length && !s.sectionId) m.push(t('reg_section_short'));
   if (!s.productId && !s.categoryId) m.push(t('product'));
   if (!(weightNumber() > 0)) m.push(t('weight'));
   if (!s.reasonId) m.push(t('reason'));
@@ -386,6 +405,7 @@ async function save() {
   s.saving = true; updateSave();
   const body = {
     restaurant_id: s.restaurantId,
+    section_id: sectionsOf(s.restaurantId).length ? s.sectionId : null,
     product_id: s.productId,
     product_name: s.productId ? null : (s.productName || null),
     waste_category_id: s.categoryId,
@@ -421,9 +441,36 @@ async function save() {
     renderAll();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     loadToday(); loadTop(true);
+    if (lbOn()) askPrevention(rec);
   } catch (e) {
     s.saving = false; updateSave(); toastError(e);
   }
+}
+
+// ------------------------------------------------------------------ prevention question (leaderboard on)
+function askPrevention(rec) {
+  const sec = (state.meta.sections || []).find((x) => x.id === rec.section_id);
+  const hints = ['prev_hint_batch', 'prev_hint_fifo', 'prev_hint_order', 'prev_hint_portion', 'prev_hint_store'];
+  openModal(`<h2>${t('prev_q')}</h2>
+    <p class="small muted">${sec ? t('prev_sub_section', { s: esc(sec.name) }) : t('prev_sub')}</p>
+    <div class="chips" style="margin-bottom:10px">${hints.map((h) => `<button type="button" class="chip" data-hint="${h}">${t(h)}</button>`).join('')}</div>
+    <form id="prev-form"><div class="field"><textarea name="text" rows="3" maxlength="500" placeholder="${t('prev_ph')}"></textarea></div>
+      <div class="err" id="prev-err"></div>
+      <div class="modal-actions"><button type="button" data-close>${t('prev_skip')}</button><button class="btn-primary" id="prev-send">${t('prev_send')}</button></div></form>`,
+  (card, close) => {
+    const ta = card.querySelector('textarea');
+    $$('[data-hint]', card).forEach((b) => (b.onclick = () => { ta.value = ta.value ? `${ta.value.replace(/\s+$/, '')} ${t(b.dataset.hint)}` : t(b.dataset.hint); ta.focus(); }));
+    card.querySelector('#prev-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const text = ta.value.trim();
+      if (text.length < 3) { card.querySelector('#prev-err').textContent = t('prev_short'); return; }
+      card.querySelector('#prev-send').disabled = true;
+      try {
+        await api('/prevention-ideas', { method: 'POST', body: { waste_record_id: rec.id, text } });
+        close(); toast(t('prev_thanks'));
+      } catch (err) { card.querySelector('#prev-err').textContent = err.message; card.querySelector('#prev-send').disabled = false; }
+    };
+  });
 }
 
 // ------------------------------------------------------------------ today

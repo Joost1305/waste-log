@@ -100,7 +100,7 @@ route('POST', '/organizations', async ({ body }) => {
 });
 route('GET', '/organization', async () => check(await sb.from('organizations').select('*').eq('id', ctx.orgId).single()));
 route('PATCH', '/organization', async ({ body }) =>
-  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled'])).eq('id', ctx.orgId).select().single()));
+  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start'])).eq('id', ctx.orgId).select().single()));
 
 // restaurants
 route('GET', '/restaurants', async () => check(await sb.from('restaurants').select('*').eq('organization_id', ctx.orgId).is('deleted_at', null).order('name')));
@@ -226,7 +226,7 @@ route('GET', '/waste', async ({ query }) => {
   return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
 });
 function wasteRow(body) {
-  const row = pick(body, ['restaurant_id', 'product_id', 'product_name', 'waste_category_id', 'category_id', 'reason_id', 'menu_item_id',
+  const row = pick(body, ['restaurant_id', 'section_id', 'product_id', 'product_name', 'waste_category_id', 'category_id', 'reason_id', 'menu_item_id',
     'supplier_id', 'location', 'moment', 'note', 'recorded_at']);
   if (body.weight !== undefined) {
     row.weight_kg = Math.round((body.unit === 'g' ? body.weight / 1000 : body.weight) * 1000) / 1000;
@@ -241,7 +241,7 @@ route('POST', '/waste', async ({ body }) => {
   if (['manual', 'scale', 'estimate'].includes(body.weight_source)) row.weight_source = body.weight_source;
   if (body.ai_suggestion) { row.ai_suggestion = body.ai_suggestion; row.ai_accepted = body.ai_accepted ?? null; }
   if (row.weight_kg > 500) throw new ApiError(400, 'Weight above 500 kg in one record, please check the unit');
-  return check(await sb.from('waste_records').insert(row).select('id, product_name, waste_category_id, weight_kg, purchase_value, valuation_method').single());
+  return check(await sb.from('waste_records').insert(row).select('id, product_name, waste_category_id, section_id, weight_kg, purchase_value, valuation_method').single());
 });
 route('PATCH', '/waste/:id', async ({ p, body }) =>
   check(await sb.from('waste_records').update(wasteRow(body)).eq('id', p.id).select('id'), true)[0]);
@@ -341,6 +341,23 @@ route('PATCH', '/report-subscriptions/:id', async ({ p, body }) => check(await s
 route('DELETE', '/report-subscriptions/:id', async ({ p }) => softDelete('report_subscriptions', p.id));
 route('POST', '/report-subscriptions/:id/preview', async ({ p }) => invoke('weekly-report', { action: 'preview', id: Number(p.id) }));
 route('POST', '/report-subscriptions/:id/send', async ({ p, body }) => invoke('weekly-report', { action: 'send', id: Number(p.id), to: body.to }));
+
+// leaderboard between sections (switch in Settings › Leaderboard)
+route('GET', '/leaderboard', async ({ query }) => check(await sb.rpc('leaderboard', {
+  p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang })));
+route('GET', '/prevention-ideas', async ({ query }) => check(await sb.rpc('prevention_ideas_list', { p_org: ctx.orgId, p_status: query.status || null, p_lang: ctx.lang })));
+route('POST', '/prevention-ideas', async ({ body }) =>
+  check(await sb.from('prevention_ideas').insert({ waste_record_id: body.waste_record_id, text: body.text }).select('id').single()));
+route('PATCH', '/prevention-ideas/:id', async ({ p, body }) =>
+  check(await sb.from('prevention_ideas').update(pick(body, ['status', 'review_note'])).eq('id', p.id).select('id'), true));
+route('POST', '/leaderboard/awards', async ({ body }) => check(await sb.from('leaderboard_awards')
+  .insert(pick(body, ['restaurant_id', 'section_id', 'period_from', 'period_to', 'points', 'prize', 'note'])).select('id').single()));
+route('DELETE', '/leaderboard/awards/:id', async ({ p }) => softDelete('leaderboard_awards', p.id));
+route('GET', '/sections', async () => check(await sb.from('sections').select('id, restaurant_id, name, sort_order, is_active')
+  .eq('organization_id', ctx.orgId).is('deleted_at', null).order('sort_order').order('name')));
+route('POST', '/sections', async ({ body }) => check(await sb.from('sections').insert(pick(body, ['restaurant_id', 'name', 'sort_order', 'is_active'])).select('id').single()));
+route('PATCH', '/sections/:id', async ({ p, body }) => check(await sb.from('sections').update(pick(body, ['name', 'sort_order', 'is_active'])).eq('id', p.id).select('id'), true));
+route('DELETE', '/sections/:id', async ({ p }) => softDelete('sections', p.id));
 
 // dashboard
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
