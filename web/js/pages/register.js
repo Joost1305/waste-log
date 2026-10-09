@@ -129,7 +129,7 @@ function renderPhoto() {
   el.className = 'step done';
   el.innerHTML = `${head}<div class="photo-row"><img src="${p.url}" alt="">${ai}</div>
     <div style="margin-top:8px"><button type="button" class="btn-sm btn-ghost" id="photo-remove">${t('reg_remove')}</button></div>`;
-  $('#photo-remove').onclick = () => { URL.revokeObjectURL(p.url); s.photo = null; renderPhoto(); };
+  $('#photo-remove').onclick = () => { URL.revokeObjectURL(p.url); s.photo = null; renderPhoto(); updateSave(); };
   const use = $('#ai-use');
   if (use) use.onclick = () => applySuggestion(p.suggestion);
 }
@@ -420,6 +420,8 @@ function updateSave() {
 function markNextStep() {
   const steps = [
     [$('#sec-restaurant .reg-sections'), !(sectionsOf(s.restaurantId).length && !s.sectionId)],
+    // The photo comes first, but stops being the next step as soon as someone skips it and fills in anything else
+    [$('#sec-photo'), !!s.photo || !!(s.productId || s.categoryId || s.productName || weightNumber() > 0 || s.reasonId)],
     [$('#sec-what'), !!(s.productId || s.categoryId)],
     [$('#sec-weight'), weightNumber() > 0],
     [$('#sec-reason'), !!s.reasonId],
