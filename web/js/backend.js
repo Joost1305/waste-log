@@ -330,6 +330,18 @@ route('POST', '/documents', async ({ form }) => {
   return { path, name: file.name, type: file.type };
 });
 
+// weekly impact e-mail: one list of recipients per restaurant (or one overview for all restaurants)
+route('GET', '/report-subscriptions', async () => check(await sb.from('report_subscriptions')
+  .select('id, restaurant_id, recipients, language, is_active, last_sent_week, last_sent_at, last_status')
+  .eq('organization_id', ctx.orgId).is('deleted_at', null)));
+route('POST', '/report-subscriptions', async ({ body }) => check(await sb.from('report_subscriptions')
+  .insert({ ...pick(body, ['restaurant_id', 'recipients', 'language', 'is_active']), organization_id: ctx.orgId }).select('id').single()));
+route('PATCH', '/report-subscriptions/:id', async ({ p, body }) => check(await sb.from('report_subscriptions')
+  .update(pick(body, ['recipients', 'language', 'is_active'])).eq('id', p.id).select('id'), true));
+route('DELETE', '/report-subscriptions/:id', async ({ p }) => softDelete('report_subscriptions', p.id));
+route('POST', '/report-subscriptions/:id/preview', async ({ p }) => invoke('weekly-report', { action: 'preview', id: Number(p.id) }));
+route('POST', '/report-subscriptions/:id/send', async ({ p, body }) => invoke('weekly-report', { action: 'send', id: Number(p.id), to: body.to }));
+
 // dashboard
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang,

@@ -346,3 +346,42 @@ test('best practices: managers publish for their restaurant, everyone in the org
   const other = await as(db, U['admin@bistro'], async ({ one }) => (await one(`select best_practices_list() l`)).l);
   assert.ok(!other.rows.some((r) => r.id === bp.id));
 });
+
+test('weekly e-mail: recipients cleaned and checked, own restaurants only, report content', async () => {
+  const s = await as(db, U['manager.amsterdam@hth'], ({ one }) => one(
+    `insert into report_subscriptions (restaurant_id, recipients, language) values ($1, $2, 'nl') returning *`,
+    [ID.ams, [' Chef@HTH.nl ', 'chef@hth.nl', 'souschef@hth.nl', '']]));
+  assert.deepEqual(s.recipients, ['chef@hth.nl', 'souschef@hth.nl']);
+  assert.equal(s.organization_id, ID.hth);
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(
+    `update report_subscriptions set recipients = '{not-an-address}' where id = $1`, [s.id])), /Invalid e-mail address/);
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(
+    `insert into report_subscriptions (restaurant_id, recipients) values ($1, '{a@b.nl}')`, [ID.hague])));
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(
+    `insert into report_subscriptions (restaurant_id, recipients) values (null, '{a@b.nl}')`)), 'whole organization needs an org admin');
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(
+    `insert into report_subscriptions (restaurant_id, recipients) values ($1, '{a@b.nl}')`, [ID.ams])));
+  const org = await as(db, U['orgadmin@hth'], ({ one }) => one(
+    `insert into report_subscriptions (restaurant_id, recipients) values (null, '{director@hth.nl}') returning id`));
+  // Preview: last full week, restaurant scope
+  const p = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select weekly_report_preview($1) p', [s.id])).p);
+  assert.equal(p.scope, 'restaurant');
+  assert.equal(p.restaurant, 'Amsterdam Restaurant');
+  const wk = (await db.query(`select (date_trunc('week', current_date)::date - 7)::text d`)).rows[0].d;
+  assert.equal(p.week_from, wk);
+  const kg = (await db.query(`select coalesce(sum(weight_kg),0) kg from waste_records where restaurant_id = $1 and deleted_at is null
+     and app.local_date(recorded_at) between $2::date and $2::date + 6`, [ID.ams, wk])).rows[0].kg;
+  assert.ok(Math.abs(p.this_week.kg - Number(kg)) < 0.05);
+  assert.ok(Array.isArray(p.top_products) && p.top_products.length <= 3);
+  const po = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select weekly_report_preview($1) p', [org.id])).p);
+  assert.ok(po.by_restaurant.length >= 2);
+  // Managers of other restaurants cannot preview this list; the due list is not open to users
+  const other = await as(db, U['manager.denhaag@hth'], async ({ one }) => (await one('select weekly_report_preview($1) p', [s.id])).p);
+  assert.equal(other, null);
+  await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q('select weekly_reports_due()')));
+  const due = (await db.query('select weekly_reports_due() d')).rows[0].d;
+  assert.ok(due.some((d) => d.subscription_id === s.id && d.language === 'nl'));
+  await db.query('select weekly_report_mark($1, $2, $3)', [s.id, wk, 'sent']);
+  const due2 = (await db.query('select weekly_reports_due() d')).rows[0].d;
+  assert.ok(!due2.some((d) => d.subscription_id === s.id), 'sent once per week');
+});

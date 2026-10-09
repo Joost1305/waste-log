@@ -1,8 +1,11 @@
 // Daily job, called once a day by a GitHub Action:
 // 1. keeps the free Supabase project active (any request counts as activity);
-// 2. stores yesterday's and today's weather (Open-Meteo, no key) for every restaurant with coordinates.
+// 2. stores yesterday's and today's weather (Open-Meteo, no key) for every restaurant with coordinates;
+// 3. sends the weekly impact e-mails for last week (Monday to Sunday) that have not gone out yet.
+//    The first run on Monday sends them; if that run was missed, the next day's run catches up.
 // It is idempotent and only fetches what is missing, so calling it more often does no harm.
 import { admin, cors, json } from '../_shared/common.ts';
+import { mailConfig, renderReport, sendMail } from '../_shared/report.ts';
 
 const WMO = (c: number) => (c === 0 ? 'clear' : c <= 3 ? 'cloudy' : c <= 48 ? 'fog' : (c <= 67 || (c >= 80 && c <= 82)) ? 'rain' : (c <= 77 || c === 85 || c === 86) ? 'snow' : 'storm');
 
@@ -39,5 +42,21 @@ Deno.serve(async (req) => {
       synced += rows.length;
     } catch (e) { errors.push(`restaurant ${r.id}: ${(e as Error).message}`); }
   }
-  return json({ ok: true, data: { date: today, weather_rows: synced, errors } });
+  // Weekly e-mails (each list once per week; the database keeps track of what was sent)
+  let mails = 0;
+  const cfg = mailConfig();
+  const { data: due, error: dueErr } = await sb.rpc('weekly_reports_due');
+  if (dueErr) errors.push(`weekly e-mail: ${dueErr.message}`);
+  for (const d of (due || []) as any[]) {
+    if (!d || !d.subscription_id) continue;
+    if (!cfg.key) { await sb.rpc('weekly_report_mark', { p_id: d.subscription_id, p_week: null, p_status: 'no_mail_service' }); continue; }
+    try {
+      const { html, subject } = renderReport(d, cfg.appUrl);
+      const r = await sendMail(d.recipients, subject, html);
+      await sb.rpc('weekly_report_mark', { p_id: d.subscription_id, p_week: r.ok ? d.week_from : null,
+        p_status: r.ok ? `sent to ${d.recipients.length}` : String(r.error) });
+      if (r.ok) mails += d.recipients.length; else errors.push(`weekly e-mail ${d.subscription_id}: ${r.error}`);
+    } catch (e) { errors.push(`weekly e-mail ${d.subscription_id}: ${(e as Error).message}`); }
+  }
+  return json({ ok: true, data: { date: today, weather_rows: synced, weekly_mails: mails, errors } });
 });

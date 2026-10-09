@@ -127,6 +127,7 @@ function sections() {
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
     },
+    p.dashboard && { key: 'weekly', title: t('set_weekly'), custom: renderWeekly },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
     p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
@@ -225,6 +226,109 @@ async function renderOrg(el) {
     e.preventDefault();
     try { await api('/organization', { method: 'PATCH', body: readForm(el, fields) }); await loadMeta(); toast(t('org_saved')); } catch (err) { toastError(err); }
   };
+}
+
+// ------------------------------------------------------------------ weekly impact e-mail
+async function renderWeekly(el) {
+  const meta = state.meta;
+  el.innerHTML = `<div class="card"><h2>${t('set_weekly')}</h2><p class="muted small">${t('wk_sub')}</p><div id="wk-list"><span class="spinner"></span></div></div>`;
+  let subs = [];
+  try { subs = (await api('/report-subscriptions')).data || []; } catch (e) { toastError(e); return; }
+  const rows = [
+    ...(meta.permissions.users ? [{ restaurant_id: null, name: t('wk_overview') }] : []),
+    ...meta.restaurants.map((r) => ({ restaurant_id: r.id, name: r.name })),
+  ].map((r) => ({ ...r, sub: subs.find((s) => (s.restaurant_id || null) === r.restaurant_id) }));
+  const status = (s) => {
+    if (!s) return `<span class="muted">${t('wk_none')}</span>`;
+    if (!s.is_active) return `<span class="badge">${t('wk_paused')}</span>`;
+    if (s.last_status === 'no_mail_service') return `<span class="badge warn">${t('wk_no_mail')}</span>`;
+    if (s.last_sent_week) return `<span class="badge green">&#10003; ${t('wk_last', { d: fmt.date(s.last_sent_at) })}</span>`;
+    return `<span class="badge green">${t('wk_on')}</span>`;
+  };
+  $('#wk-list', el).innerHTML = `<div class="table-wrap"><table><thead><tr><th>${t('restaurant')}</th><th>${t('wk_recipients')}</th><th>${t('language')}</th><th>${t('status')}</th><th></th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr><td><strong>${esc(r.name)}</strong></td>
+      <td class="small">${r.sub && r.sub.recipients.length ? `${esc(r.sub.recipients.slice(0, 2).join(', '))}${r.sub.recipients.length > 2 ? ` +${r.sub.recipients.length - 2}` : ''}` : '<span class="muted">–</span>'}</td>
+      <td>${r.sub ? r.sub.language.toUpperCase() : ''}</td><td>${status(r.sub)}</td>
+      <td class="actions"><button class="btn-sm" data-wk="${i}">${r.sub ? t('edit') : t('wk_setup')}</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="small muted" style="margin-top:12px">${t('wk_when')}</p>`;
+  $$('[data-wk]', el).forEach((b) => (b.onclick = () => editWeekly(rows[Number(b.dataset.wk)], () => renderWeekly(el))));
+}
+
+function editWeekly(row, reload) {
+  const s = row.sub;
+  openModal(`<h2>${t('set_weekly')}: ${esc(row.name)}</h2>
+    <form id="wk-form">
+      <div class="field"><label>${t('wk_recipients')}</label>
+        <textarea name="recipients" rows="4" placeholder="chef@hotelschool.nl&#10;souschef@hotelschool.nl">${esc(s ? s.recipients.join('\n') : '')}</textarea>
+        <div class="small muted">${t('wk_recipients_help')}</div></div>
+      <div class="field"><label>${t('language')}</label><select name="language">
+        ${['en', 'nl'].map((l) => `<option value="${l}" ${(s ? s.language : (state.meta.organization.default_language || 'en')) === l ? 'selected' : ''}>${LANGS[l] || l}</option>`).join('')}</select></div>
+      <div class="field"><label class="check"><input type="checkbox" name="is_active" ${!s || s.is_active ? 'checked' : ''}> ${t('wk_active')}</label></div>
+      ${s && s.last_status ? `<p class="small muted">${t('wk_last_status')}: ${esc(s.last_status === 'no_mail_service' ? t('wk_no_mail') : s.last_status)}</p>` : ''}
+      <div class="err" id="wk-err"></div>
+      <div class="modal-actions" style="flex-wrap:wrap">
+        ${s ? `<button type="button" class="btn-ghost btn-danger" id="wk-del" style="margin-right:auto">${t('delete')}</button>
+          <button type="button" class="btn-sm" id="wk-prev">${t('wk_preview')}</button>` : ''}
+        <button type="button" data-close>${t('cancel')}</button><button class="btn-primary">${t('save')}</button></div>
+    </form>`, (card, close) => {
+    const read = () => {
+      const recipients = $('[name=recipients]', card).value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+      const bad = recipients.find((x) => !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x));
+      if (bad) throw new Error(t('wk_bad', { e: bad }));
+      return { recipients, language: $('[name=language]', card).value, is_active: $('[name=is_active]', card).checked };
+    };
+    $('#wk-form', card).onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const body = read();
+        if (s) await api(`/report-subscriptions/${s.id}`, { method: 'PATCH', body });
+        else await api('/report-subscriptions', { method: 'POST', body: { ...body, restaurant_id: row.restaurant_id } });
+        close(); toast(t('saved')); reload();
+      } catch (err) { $('#wk-err', card).textContent = err.message; }
+    };
+    if (s) {
+      $('#wk-del', card).onclick = async () => {
+        close();
+        if (!(await confirmDialog(t('wk_del_confirm', { n: row.name })))) return;
+        try { await api(`/report-subscriptions/${s.id}`, { method: 'DELETE' }); reload(); } catch (err) { toastError(err); }
+      };
+      $('#wk-prev', card).onclick = () => { close(); previewWeekly(s, row, reload); };
+    }
+  });
+}
+
+async function previewWeekly(s, row, reload) {
+  openModal(`<div class="card empty"><span class="spinner"></span> ${t('wk_building')}</div>`);
+  let p;
+  try { p = (await api(`/report-subscriptions/${s.id}/preview`, { method: 'POST' })).data; } catch (e) { toastError(e); document.getElementById('modal').hidden = true; return; }
+  openModal(`<div class="wk-preview"><h2>${t('wk_preview')}: ${esc(row.name)}</h2>
+    <div class="small muted">${t('wk_subject')}: <strong>${esc(p.subject)}</strong><br>${t('wk_to')}: ${esc(p.recipients.join(', ') || '–')}</div>
+    ${p.mail_ready ? '' : `<div class="note" style="margin:10px 0">${t('wk_no_mail_long')}</div>`}
+    <iframe class="wk-frame" title="preview" sandbox=""></iframe>
+    <div class="err" id="wk-perr"></div>
+    <div class="modal-actions" style="flex-wrap:wrap">
+      ${p.mail_ready ? `<button type="button" class="btn-sm" id="wk-me">${t('wk_send_me')}</button>
+        <button type="button" class="btn-sm" id="wk-all">${t('wk_send_list', { n: p.recipients.length })}</button>` : ''}
+      <button data-close>${t('close')}</button></div></div>`, (card) => {
+    card.querySelector('.wk-frame').srcdoc = p.html;
+    const send = async (to, btn) => {
+      btn.disabled = true;
+      try {
+        const r = (await api(`/report-subscriptions/${s.id}/send`, { method: 'POST', body: { to } })).data;
+        if (r && r.ok) { toast(t('wk_sent', { n: r.sent })); reload(); } else $('#wk-perr', card).textContent = r && r.error === 'no_mail_service' ? t('wk_no_mail_long') : (r && r.error) || 'Error';
+      } catch (e) { $('#wk-perr', card).textContent = e.message; }
+      btn.disabled = false;
+    };
+    if ($('#wk-me', card)) $('#wk-me', card).onclick = (e) => send('me', e.target);
+    if ($('#wk-all', card)) $('#wk-all', card).onclick = async () => {
+      if (!(await confirmDialog(t('wk_send_confirm', { n: p.recipients.length }), t('wk_send_list', { n: p.recipients.length }), false))) return;
+      try {
+        const r = (await api(`/report-subscriptions/${s.id}/send`, { method: 'POST', body: { to: 'list' } })).data;
+        if (r && r.ok) { toast(t('wk_sent', { n: r.sent })); reload(); } else toast((r && r.error) || 'Error', 'error');
+      } catch (err) { toastError(err); }
+    };
+  });
 }
 
 function renderExport(el) {

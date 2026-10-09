@@ -307,3 +307,7 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 }
 @media print { .bp-grid { grid-template-columns: 1fr 1fr; } .bp-card, .iv-card { break-inside: avoid; } }
 #iv-filters .filters { margin-bottom: 14px; }
+
+/* Weekly e-mail preview */
+.modal-card:has(.wk-preview) { max-width: 760px; }
+.wk-frame { width: 100%; height: 60vh; border: 1px solid var(--line); border-radius: 10px; margin-top: 12px; background: #F4F2EC; }

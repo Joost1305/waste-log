@@ -109,7 +109,7 @@ declare
   v_saved numeric; v_weekly jsonb; v_status text;
 begin
   select * into i from public.interventions x where x.id = p_id and x.deleted_at is null;
-  if not found or not app.in_org(i.organization_id) or app.rank() < 30 then return null; end if;
+  if not found or not app.can_see_intervention(i.organization_id) then return null; end if;
 
   a_from := i.start_date;
   a_to := least(coalesce(i.end_date, v_today), v_today, a_from + v_days - 1);
