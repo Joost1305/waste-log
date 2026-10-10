@@ -498,3 +498,14 @@ test('opening days: per-day figures count only the days a restaurant is open', a
   assert.equal(d.totals.open_days, 5);
   await db.query(`update restaurants set open_days = '{1,2,3,4,5,6,7}' where id = $1`, [ID.ams]);
 });
+
+test('dashboard: waste per section for restaurants with sections', async () => {
+  const sec = await db.query(`insert into sections (restaurant_id, name) values ($1, 'Grill test') returning id`, [ID.ams]);
+  const rec = await as(db, U['student@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_name: 'Steak', waste_category_id: ID.prepared, reason_id: ID.spoilage, weight_kg: 2 })));
+  await db.query(`update waste_records set section_id = $1 where id = $2`, [sec.rows[0].id, rec.id]);
+  const d = await as(db, U['manager.amsterdam@hth'], async ({ one }) =>
+    (await one(`select dashboard(null, $1, current_date - 1, current_date) d`, [ID.ams])).d);
+  const row = d.by_section.find((x) => x.name === 'Grill test');
+  assert.ok(row && Number(row.kg) >= 2 && row.restaurant);
+  await db.query(`update sections set deleted_at = now() where id = $1`, [sec.rows[0].id]);
+});

@@ -378,3 +378,10 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .mp-line { display: flex; gap: 6px; flex-wrap: wrap; }
 .mp-line input, .mp-line select { flex: 1 1 140px; min-width: 0; }
 @media (max-width: 640px) { .mp-row { grid-template-columns: 1fr; } }
+
+/* dashboard: waste per section */
+.nowrap { white-space: nowrap; }
+.sec-share { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.sec-bar { width: 70px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; display: inline-block; }
+.sec-bar span { display: block; height: 100%; background: var(--primary); }
+@media (max-width: 640px) { .sec-bar { width: 40px; } }

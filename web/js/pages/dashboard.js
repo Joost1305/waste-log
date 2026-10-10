@@ -112,6 +112,7 @@ function draw(d) {
       [t('restaurant'), 'kg', t('value'), t('guests'), t('g_per_guest')],
       d.by_restaurant.map((r) => [esc(r.name), fmt.kg(r.kg, 0), fmt.money(r.value), fmt.num(r.guests), r.g_per_guest != null ? `${fmt.num(r.g_per_guest)} g` : '–']),
       [false, true, true, true, true])}</div>` : ''}
+    ${sectionCard(d.by_section || [])}
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card"><h2>${t('by_supplier')}</h2>${table(
         [t('reg_supplier'), t('wasted'), t('purchased'), t('waste_rate')],
@@ -176,4 +177,22 @@ function table(head, rows, numeric) {
   if (!rows.length) return `<div class="empty small">${t('no_data')}</div>`;
   return `<div class="table-wrap"><table><thead><tr>${head.map((h, i) => `<th class="${numeric[i] ? 'right' : ''}">${h}</th>`).join('')}</tr></thead>
     <tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td class="${numeric[i] ? 'right num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+// Waste per section (food court counters etc.); share is within the section's own restaurant
+function sectionCard(rows) {
+  if (!rows.length) return '';
+  const tot = {};
+  rows.forEach((r) => { tot[r.restaurant_id] = (tot[r.restaurant_id] || 0) + Number(r.kg); });
+  const multi = new Set(rows.map((r) => r.restaurant_id)).size > 1;
+  const name = (r) => `${r.name ? esc(r.name) : `<span class="muted">${t('no_section')}</span>`}${multi ? ` <span class="muted small">· ${esc(r.restaurant)}</span>` : ''}
+    <div class="muted small">${t('ds_regs_n', { n: fmt.num(r.records) })}</div>`;
+  const share = (r) => {
+    const p = tot[r.restaurant_id] > 0 ? Number(r.kg) / tot[r.restaurant_id] * 100 : 0;
+    return `<span class="sec-share"><span class="sec-bar"><span style="width:${p.toFixed(1)}%"></span></span>${fmt.pct(p, 0)}</span>`;
+  };
+  return `<div class="card" style="margin-top:16px"><h2>${t('by_section')}</h2>${table(
+    [t('lb_section'), 'kg', t('ds_share'), t('value')],
+    rows.map((r) => [name(r), `<span class="nowrap">${fmt.kg(r.kg, 1)}</span>`, share(r), `<span class="nowrap">${fmt.money(r.value)}</span>`]),
+    [false, true, true, true])}</div>`;
 }
