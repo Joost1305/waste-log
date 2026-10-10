@@ -151,12 +151,14 @@ function sections() {
 
 export async function renderSettings(rest) {
   const list = sections();
-  const current = list.find((s) => s.key === rest[0]) || list[0];
+  const chosen = list.find((s) => s.key === rest[0]);
+  const current = chosen || list[0];
+  // Phone: without a chosen section only the list shows; with one, only that section plus a back link
   app().innerHTML = `
     <div class="page-head"><h1>${t('set_title')}</h1></div>
-    <div class="settings">
+    <div class="settings ${chosen ? 'has-section' : 'menu-only'}">
       <nav class="settings-nav">${list.map((s) => `<a href="#/settings/${s.key}" class="${s === current ? 'active' : ''}">${s.title}</a>`).join('')}</nav>
-      <div id="set-body"></div>
+      <div class="settings-main"><a href="#/settings" class="settings-back">&#8249; ${t('set_title')}</a><div id="set-body"></div></div>
     </div>`;
   if (current.custom) return current.custom($('#set-body'));
   return crud($('#set-body'), current);
@@ -171,9 +173,9 @@ async function crud(el, cfg) {
   let rows = [];
   const load = async () => {
     try { rows = (await api(cfg.endpoint)).data; } catch (e) { toastError(e); return; }
-    $('#crud-list').innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr>
+    $('#crud-list').innerHTML = rows.length ? `<div class="table-wrap"><table class="stack"><thead><tr>
       ${cfg.columns.map((c) => `<th class="${c[2] ? 'right' : ''}">${c[0]}</th>`).join('')}<th></th></tr></thead><tbody>
-      ${rows.map((r) => `<tr>${cfg.columns.map((c) => `<td class="${c[2] ? 'right num' : ''}">${c[1](r) ?? ''}</td>`).join('')}
+      ${rows.map((r) => `<tr>${cfg.columns.map((c) => `<td class="${c[2] ? 'right num' : ''}" data-label="${esc(String(c[0]).replace(/<[^>]*>/g, ''))}">${c[1](r) ?? ''}</td>`).join('')}
         <td class="actions">${(cfg.rowActions || []).map((a, i) => (a.show(r) ? `<button class="btn-sm btn-ghost" data-act="${i}" data-id="${r.id}">${a.label}</button>` : '')).join('')}
         ${cfg.canEdit ? `<button class="btn-sm" data-edit="${r.id}">${t('edit')}</button>` : ''}
         ${canDelete && r.id !== state.user.id ? `<button class="btn-sm btn-ghost btn-danger" data-del="${r.id}">${t('delete')}</button>` : ''}</td></tr>`).join('')}
