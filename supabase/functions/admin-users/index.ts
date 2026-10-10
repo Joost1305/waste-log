@@ -69,6 +69,26 @@ Deno.serve(async (req) => {
     const roleErr = checkRole(role); if (roleErr) return roleErr;
     const rids = await checkRestaurants(body.restaurant_ids); if (rids instanceof Response) return rids;
 
+    // Someone who was deleted earlier (any organization) is brought back instead of failing on "Email already in use".
+    const mail = email.trim().toLowerCase();
+    const { data: gone } = await sb.from('users').select('id').eq('email', mail).not('deleted_at', 'is', null).maybeSingle();
+    if (gone) {
+      const uid = gone.id;
+      const { error: uErr } = await sb.auth.admin.updateUserById(uid, { ban_duration: 'none', ...(invite ? {} : { password }) });
+      if (uErr) return fail(400, uErr.message);
+      const { error: pErr } = await sb.from('users').update({
+        organization_id: role === 'super_admin' ? null : orgId, role, name: name.trim(), language,
+        is_active: Boolean(is_active), deleted_at: null,
+      }).eq('id', uid);
+      if (pErr) return fail(400, pErr.message);
+      await sb.from('user_restaurants').delete().eq('user_id', uid);
+      if (rids.length) await sb.from('user_restaurants').insert(rids.map((r) => ({ user_id: uid, restaurant_id: r })));
+      // They already have a login: an invitation becomes a "choose a new password" e-mail
+      if (invite) await sb.auth.resetPasswordForEmail(mail, { redirectTo: redirect(body.redirect_to) });
+      await audit('restore', uid, { email: mail, role });
+      return json({ ok: true, data: { id: uid, restored: true } }, 201);
+    }
+
     // Invite: Supabase emails a link; the person sets their own password in the app.
     const { data: created, error } = invite
       ? await sb.auth.admin.inviteUserByEmail(email.trim().toLowerCase(), { data: { name: name.trim() }, redirectTo: redirect(body.redirect_to) })
