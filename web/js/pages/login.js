@@ -17,6 +17,7 @@ export function renderLogin(onSuccess) {
         <div class="field"><label>${t('password')}</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="btn-primary btn-xl" type="submit">${t('sign_in')}</button>
         <div class="demo-accounts" hidden>${t('demo_accounts')}<br>
+          <button type="button" class="btn-sm own-login" data-own="j.de.vos@hotelschool.nl"><strong>Joost de Vos</strong><span>j.de.vos@hotelschool.nl · ${t('own_login_hint')}</span></button>
           <div class="demo-btns">${DEMO.map((d) => `<button type="button" class="btn-sm" data-demo="${esc(d.email)}"><strong>${t(d.label)}</strong><span>${esc(d.email)}</span></button>`).join('')}</div></div>
       </form>
     </div>`;
@@ -25,6 +26,10 @@ export function renderLogin(onSuccess) {
   form.querySelector('.demo-accounts').hidden = !SHOW_DEMO_LOGINS;
   form.querySelectorAll('[data-demo]').forEach((b) => (b.onclick = () => {
     form.email.value = b.dataset.demo; form.password.value = 'demo1234'; form.requestSubmit();
+  }));
+  // Own account: fills in the e-mail only; the password stays private (the phone's password manager can fill it)
+  form.querySelectorAll('[data-own]').forEach((b) => (b.onclick = () => {
+    form.email.value = b.dataset.own; form.password.value = ''; form.password.focus();
   }));
   form.onsubmit = async (e) => {
     e.preventDefault();
