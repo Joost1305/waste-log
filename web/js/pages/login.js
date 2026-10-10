@@ -2,7 +2,8 @@ import { api, app, esc, toastError, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { SHOW_DEMO_LOGINS } from '../config.js';
 
-const DEMO = ['orgadmin@hth.demo', 'manager.amsterdam@hth.demo', 'student@hth.demo', 'admin@platform.demo'];
+// Two demo logins on the sign-in page; one tap fills in the account and signs in (password demo1234)
+const DEMO = [{ email: 'orgadmin@hth.demo', label: 'demo_admin' }, { email: 'student@hth.demo', label: 'demo_student' }];
 
 export function renderLogin(onSuccess) {
   app().className = 'app';
@@ -16,7 +17,7 @@ export function renderLogin(onSuccess) {
         <div class="field"><label>${t('password')}</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="btn-primary btn-xl" type="submit">${t('sign_in')}</button>
         <div class="demo-accounts" hidden>${t('demo_accounts')}<br>
-          ${DEMO.map((e) => `<button type="button" class="btn-sm" data-demo="${esc(e)}">${esc(e)}</button>`).join('')}</div>
+          <div class="demo-btns">${DEMO.map((d) => `<button type="button" class="btn-sm" data-demo="${esc(d.email)}"><strong>${t(d.label)}</strong><span>${esc(d.email)}</span></button>`).join('')}</div></div>
       </form>
     </div>`;
   const form = document.getElementById('login-form');
