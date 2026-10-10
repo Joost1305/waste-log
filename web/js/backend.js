@@ -64,6 +64,14 @@ route('POST', '/auth/login', async ({ body }) => {
   if (error) throw new ApiError(401, error.message === 'Invalid login credentials' ? 'Email or password is incorrect' : error.message);
   return { user: await profile() };
 });
+// Forgot password: Supabase e-mails a reset link; the answer is the same whether the address exists or not
+route('POST', '/auth/forgot', async ({ body }) => {
+  const email = String(body.email || '').trim();
+  if (!email) throw new ApiError(400, 'Email is required');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${location.pathname}` });
+  if (error && /rate|seconds/i.test(error.message)) throw new ApiError(429, error.message);
+  return { sent: true };
+});
 route('POST', '/auth/logout', async () => { await sb.auth.signOut(); return { signedOut: true }; });
 route('GET', '/auth/me', async () => ({ user: await profile() }));
 // Set a new password after following an invitation or reset link (the link itself signed the person in).

@@ -1,4 +1,4 @@
-import { api, app, esc, toastError, renderLangToggle } from '../core.js';
+import { api, app, esc, toast, toastError, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { SHOW_DEMO_LOGINS } from '../config.js';
 
@@ -16,6 +16,7 @@ export function renderLogin(onSuccess) {
         <div class="field"><label>${t('email')}</label><input type="email" name="email" autocomplete="username" required></div>
         <div class="field"><label>${t('password')}</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="btn-primary btn-xl" type="submit">${t('sign_in')}</button>
+        <div class="forgot-row"><button type="button" class="link-btn" id="forgot-btn">${t('forgot_pw')}</button></div>
         <div class="demo-accounts" hidden>${t('demo_accounts')}<br>
           <button type="button" class="btn-sm own-login" data-own="j.de.vos@hotelschool.nl"><strong>Joost de Vos</strong><span>j.de.vos@hotelschool.nl · ${t('own_login_hint')}</span></button>
           <div class="demo-btns">${DEMO.map((d) => `<button type="button" class="btn-sm" data-demo="${esc(d.email)}"><strong>${t(d.label)}</strong><span>${esc(d.email)}</span></button>`).join('')}</div></div>
@@ -31,6 +32,14 @@ export function renderLogin(onSuccess) {
   form.querySelectorAll('[data-own]').forEach((b) => (b.onclick = () => {
     form.email.value = b.dataset.own; form.password.value = ''; form.password.focus();
   }));
+  document.getElementById('forgot-btn').onclick = async (e) => {
+    const email = form.email.value.trim();
+    if (!email || !form.email.checkValidity()) { toastError(new Error(t('forgot_need_email'))); form.email.focus(); return; }
+    e.target.disabled = true;
+    try { await api('/auth/forgot', { method: 'POST', body: { email } }); toast(t('forgot_sent', { e: email })); }
+    catch (err) { toastError(err); }
+    finally { e.target.disabled = false; }
+  };
   form.onsubmit = async (e) => {
     e.preventDefault();
     const btn = form.querySelector('button[type=submit]');

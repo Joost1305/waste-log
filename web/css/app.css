@@ -390,3 +390,6 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .sec-bar { width: 70px; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; display: inline-block; }
 .sec-bar span { display: block; height: 100%; background: var(--primary); }
 @media (max-width: 640px) { .sec-bar { width: 40px; } }
+
+.forgot-row { text-align: center; margin-top: 10px; }
+.link-btn { background: none; border: 0; padding: 4px; color: var(--primary); text-decoration: underline; font-weight: 600; min-height: 0; }
