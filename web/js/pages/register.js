@@ -5,17 +5,16 @@ import { t } from '../i18n.js';
 
 const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent', section: 'fw_reg_section_' };
 
-// Leaderboard (switch in Settings): sections of a restaurant and the prevention question after saving
+// Sections are always asked when a restaurant has them (so you can see which counter the waste comes from).
+// The leaderboard switch only controls the prevention question, the points and the leaderboard page.
 const lbOn = () => !!(state.meta.organization && state.meta.organization.leaderboard_enabled);
-const sectionsOf = (rid) => (lbOn() ? (state.meta.sections || []).filter((x) => x.restaurant_id === rid) : []);
+const sectionsOf = (rid) => (state.meta.sections || []).filter((x) => x.restaurant_id === rid);
 // Read the switch fresh: a phone that has been open for days follows the setting without reloading
 async function refreshLeaderboardFlag() {
   try {
     const on = (await api('/leaderboard-enabled')).data;
     if (state.meta.organization && state.meta.organization.leaderboard_enabled !== on) {
       state.meta.organization.leaderboard_enabled = on;
-      if (!on) s.sectionId = null; else s.sectionId = savedSection(s.restaurantId);
-      if ($('#sec-restaurant')) { renderRestaurant(); updateSave(); }
     }
     return on;
   } catch { return lbOn(); }
