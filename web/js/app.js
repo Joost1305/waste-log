@@ -37,7 +37,10 @@ async function ensureSession() {
     state.user = me.data.user;
     setLang(state.user.language || 'en');
     if (state.user.role !== 'super_admin') state.orgId = state.user.organization_id;
-    else if (!state.orgId && state.user.organization_id) state.orgId = state.user.organization_id; // super admin starts in their own organization
+    else if (state.user.organization_id) { // super admin: every start opens in their own organization (the trial); switching still works during use
+      state.orgId = state.user.organization_id;
+      try { localStorage.setItem('fw_org', String(state.orgId)); } catch { /* private mode */ }
+    }
     await loadMeta();
     return true;
   } catch { return false; }
