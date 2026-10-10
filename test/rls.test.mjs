@@ -481,3 +481,20 @@ test('missing products: typed names show up, can be added and linked to past reg
   const m2 = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select missing_products() m')).m);
   assert.ok(!m2.some((x) => x.name === 'Spitskool'));
 });
+
+test('opening days: per-day figures count only the days a restaurant is open', async () => {
+  // 2026-10-05 is a Monday; a full week has 5 weekdays
+  const days = async (od) => {
+    await db.query(`update restaurants set open_days = $1 where id = $2`, [od, ID.ams]);
+    return (await db.query(`select app.open_days_between(array[$1::bigint], '2026-10-05', '2026-10-11') n`, [ID.ams])).rows[0].n;
+  };
+  assert.equal(await days('{1,2,3,4,5}'), 5);
+  assert.equal(await days('{1,2,3,4,5,6,7}'), 7);
+  await assert.rejects(db.query(`update restaurants set open_days = '{8}' where id = $1`, [ID.ams]));
+  // The dashboard reports the open days used for kg per day
+  await db.query(`update restaurants set open_days = '{1,2,3,4,5}' where id = $1`, [ID.ams]);
+  const d = await as(db, U['manager.amsterdam@hth'], async ({ one }) =>
+    (await one(`select dashboard(null, $1, '2026-10-05', '2026-10-11') d`, [ID.ams])).d);
+  assert.equal(d.totals.open_days, 5);
+  await db.query(`update restaurants set open_days = '{1,2,3,4,5,6,7}' where id = $1`, [ID.ams]);
+});

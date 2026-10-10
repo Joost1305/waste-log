@@ -106,10 +106,10 @@ route('PATCH', '/organization', async ({ body }) =>
 route('GET', '/restaurants', async () => check(await sb.from('restaurants').select('*').eq('organization_id', ctx.orgId).is('deleted_at', null).order('name')));
 route('POST', '/restaurants', async ({ body }) => {
   const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36).slice(-4);
-  return check(await sb.from('restaurants').insert({ ...pick(body, ['name', 'city', 'latitude', 'longitude', 'public_impact_enabled']), slug, organization_id: ctx.orgId }).select().single());
+  return check(await sb.from('restaurants').insert({ ...pick(body, ['name', 'city', 'latitude', 'longitude', 'public_impact_enabled', 'open_days']), slug, organization_id: ctx.orgId }).select().single());
 });
 route('PATCH', '/restaurants/:id', async ({ p, body }) =>
-  check(await sb.from('restaurants').update(pick(body, ['name', 'city', 'latitude', 'longitude', 'public_impact_enabled'])).eq('id', p.id).select(), true)[0]);
+  check(await sb.from('restaurants').update(pick(body, ['name', 'city', 'latitude', 'longitude', 'public_impact_enabled', 'open_days'])).eq('id', p.id).select(), true)[0]);
 route('DELETE', '/restaurants/:id', async ({ p }) => softDelete('restaurants', p.id));
 
 // users (writes via the admin-users edge function)

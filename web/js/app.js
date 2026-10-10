@@ -37,6 +37,7 @@ async function ensureSession() {
     state.user = me.data.user;
     setLang(state.user.language || 'en');
     if (state.user.role !== 'super_admin') state.orgId = state.user.organization_id;
+    else if (!state.orgId && state.user.organization_id) state.orgId = state.user.organization_id; // super admin starts in their own organization
     await loadMeta();
     return true;
   } catch { return false; }

@@ -1,7 +1,7 @@
 // Settings: products, suppliers, dishes, guests per day, targets, restaurants, users,
 // organization, audit log and (super admin) organizations. One generic CRUD view.
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, loadMeta, labelOf } from '../core.js';
-import { t, LANGS } from '../i18n.js';
+import { t, LANGS, lang } from '../i18n.js';
 import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
 import { openMissingProducts } from '../missing-products.js';
@@ -98,10 +98,13 @@ function sections() {
       // Public impact page: one link per restaurant (when switched on) and one for the whole organization
       headerActions: [{ label: `&#127757; ${t('imp_pub_open_all')}`, run: () => openPublic('') }],
       rowActions: [{ label: t('imp_pub_open'), show: (r) => r.public_impact_enabled, run: (r) => openPublic(r.slug) }],
-      columns: [[t('name'), (r) => esc(r.name)], [t('city'), (r) => esc(r.city || '')], [t('public_impact'), (r) => yes(r.public_impact_enabled)]],
+      columns: [[t('name'), (r) => esc(r.name)], [t('city'), (r) => esc(r.city || '')],
+        [t('open_days'), (r) => esc(openDaysLabel(r.open_days))], [t('public_impact'), (r) => yes(r.public_impact_enabled)]],
       fields: () => [
         { name: 'name', label: t('name'), required: true }, { name: 'city', label: t('city') },
         { name: 'latitude', label: t('latitude'), type: 'number', step: 'any' }, { name: 'longitude', label: t('longitude'), type: 'number', step: 'any' },
+        { name: 'open_days', label: t('open_days'), type: 'multiselect', default: [1, 2, 3, 4, 5, 6, 7],
+          options: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ value: d, label: weekdayName(d) })) },
         { name: 'public_impact_enabled', label: t('public_impact'), type: 'checkbox' },
       ],
     },
@@ -126,7 +129,7 @@ function sections() {
         { name: 'name', label: t('name'), required: true },
         { name: 'email', label: t('email'), type: 'email', required: true },
         { name: 'role', label: t('role'), type: 'select', blank: false, numericValue: false, options: roles.map((r) => ({ value: r, label: t('role_' + r) })) },
-        { name: 'restaurant_ids', label: t('restaurants'), type: 'multiselect', options: restOpts() },
+        { name: 'restaurant_ids', label: t('restaurants'), type: 'multiselect', options: restOpts(), default: meta.restaurants.map((r) => r.id) },
         { name: 'language', label: t('language'), type: 'select', blank: false, numericValue: false, options: Object.entries(LANGS).map(([v, l]) => ({ value: v, label: l })) },
         ...(row ? [] : [{ name: 'invite', label: t('invite_email'), type: 'checkbox', default: true }]),
         { name: 'password', label: row ? `${t('new_password')} (${t('pw_optional')})` : `${t('password')} (min. 8)`, type: 'password', emptyAsUndefined: true },
@@ -433,4 +436,15 @@ async function renderAudit(el) {
     ${rows.map((r) => `<tr><td class="nowrap small">${fmt.dateTime(r.created_at)}</td><td>${esc(r.user_name || '–')}</td>
       <td><span class="badge">${esc(r.action)}</span></td><td>${esc(r.entity)} ${r.entity_id ? '#' + r.entity_id : ''}</td>
       <td class="small muted">${esc((r.details || '').slice(0, 120))}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+// Weekday names in the current language (ISO: 1 = Monday)
+function weekdayName(d, style = 'long') {
+  return new Intl.DateTimeFormat(lang() === 'en' ? 'en-GB' : 'nl-NL', { weekday: style }).format(new Date(Date.UTC(2026, 0, 4 + d)));
+}
+function openDaysLabel(days) {
+  const d = (days || [1, 2, 3, 4, 5, 6, 7]).map(Number).sort();
+  if (d.length === 7) return t('open_every_day');
+  const run = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
+  return run && d.length > 2 ? `${weekdayName(d[0], 'short')} - ${weekdayName(d[d.length - 1], 'short')}` : d.map((x) => weekdayName(x, 'short')).join(', ');
 }
