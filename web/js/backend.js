@@ -106,6 +106,11 @@ route('POST', '/organizations', async ({ body }) => {
   const slug = String(body.name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
   return check(await sb.from('organizations').insert({ name: body.name, slug, default_value_per_kg: body.default_value_per_kg || 6.5 }).select().single());
 });
+// New organization in one step (platform admin), then invite its first admin
+route('POST', '/organizations/full', async ({ body }) => check(await sb.rpc('create_organization', { p: body })));
+route('POST', '/organizations/:id/admin', async ({ p, body }) => invoke('admin-users', {
+  action: 'create', organization_id: num(p.id), role: 'org_admin', name: body.name, email: body.email,
+  language: body.language || 'en', invite: true, is_active: true, restaurant_ids: [], redirect_to: `${location.origin}${location.pathname}` }));
 route('GET', '/organization', async () => check(await sb.from('organizations').select('*').eq('id', ctx.orgId).single()));
 route('PATCH', '/organization', async ({ body }) =>
   check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start'])).eq('id', ctx.orgId).select().single()));

@@ -449,3 +449,14 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
   font-weight: 800; font-size: 1.05rem; text-decoration: none; box-shadow: 0 0 0 3px var(--primary-soft); flex-shrink: 0; line-height: 1; }
 .help-q:hover { filter: brightness(1.1); color: #fff; }
 .help-q-sm { width: 26px; height: 26px; font-size: .9rem; vertical-align: middle; margin-left: 6px; position: relative; top: -2px; }
+
+/* new organisation form */
+.modal-card:has(.ow-modal) { max-width: 720px; }
+.ow-modal h3 { margin: 18px 0 8px; }
+.ow-rest { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px; background: var(--surface-2); }
+.ow-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.field .ow-day, .ow-day { display: inline-flex; position: relative; margin: 0; font-weight: 400; }
+.ow-day input { position: absolute; opacity: 0; pointer-events: none; }
+.ow-day span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; font-weight: 600; font-size: .85rem; background: var(--surface); cursor: pointer; text-transform: capitalize; }
+.ow-day input:checked + span { background: var(--primary); color: #fff; border-color: var(--primary); }
+.ow-day input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }

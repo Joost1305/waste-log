@@ -6,6 +6,7 @@ import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
 import { openMissingProducts } from '../missing-products.js';
 import { renderInvoices } from '../invoices.js';
+import { renderOrganizations } from '../org-wizard.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
 
@@ -143,11 +144,7 @@ function sections() {
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
     p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
-    p.organizations && {
-      key: 'organizations', title: t('set_orgs'), endpoint: '/organizations', canEdit: false, canDelete: false, afterSave: () => location.reload(),
-      columns: [[t('name'), (r) => `${esc(r.name)} ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}`], [t('restaurants_count'), (r) => r.restaurant_count, true]],
-      fields: () => [{ name: 'name', label: t('name'), required: true }, { name: 'default_value_per_kg', label: t('default_value'), type: 'number', step: '0.01', default: 6.5 }],
-    },
+    p.organizations && { key: 'organizations', title: t('set_orgs'), custom: renderOrganizations },
   ].filter(Boolean);
 }
 
