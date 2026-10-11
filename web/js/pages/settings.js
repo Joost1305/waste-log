@@ -1,6 +1,6 @@
 // Settings: products, suppliers, dishes, guests per day, targets, restaurants, users,
 // organization, audit log and (super admin) organizations. One generic CRUD view.
-import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, loadMeta, labelOf } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, loadMeta, labelOf, bindPlaceFields } from '../core.js';
 import { t, LANGS, lang } from '../i18n.js';
 import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
@@ -104,8 +104,8 @@ function sections() {
       columns: [[t('name'), (r) => esc(r.name)], [t('city'), (r) => esc(r.city || '')],
         [t('open_days'), (r) => esc(openDaysLabel(r.open_days))], [t('public_impact'), (r) => yes(r.public_impact_enabled)]],
       fields: () => [
-        { name: 'name', label: t('name'), required: true }, { name: 'city', label: t('city') },
-        { name: 'latitude', label: t('latitude'), type: 'number', step: 'any' }, { name: 'longitude', label: t('longitude'), type: 'number', step: 'any' },
+        { name: 'name', label: t('name'), required: true },
+        { name: 'city', label: t('place_label'), type: 'place', placeholder: t('place_ph') },
         { name: 'open_days', label: t('open_days'), type: 'multiselect', default: [1, 2, 3, 4, 5, 6, 7],
           options: [1, 2, 3, 4, 5, 6, 7].map((d) => ({ value: d, label: weekdayName(d) })) },
         { name: 'public_impact_enabled', label: t('public_impact'), type: 'checkbox' },
@@ -199,6 +199,7 @@ async function crud(el, cfg) {
     openModal(`<h2>${row ? t('edit') : t('add')}: ${cfg.title}</h2><form id="crud-form">${formHtml(fields, values)}
       <div class="modal-actions"><button type="button" data-close>${t('cancel')}</button><button class="btn-primary" type="submit">${t('save')}</button></div></form>`,
     (card, close) => {
+      bindPlaceFields(card);
       card.querySelector('#crud-form').onsubmit = async (e) => {
         e.preventDefault();
         const body = readForm(card, fields);

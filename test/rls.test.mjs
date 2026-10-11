@@ -571,7 +571,7 @@ test('invoices: editing replaces the old version and keeps the file', async () =
 
 test('new organization in one step: platform admin only, restaurants, sections and a product copy', async () => {
   const p = { name: 'Culinaire School Test', default_language: 'nl', restaurants: [
-    { name: 'Restaurant Eén', city: 'Utrecht', open_days: [1, 2, 3, 4, 5], sections: ['Warm', 'Koud'] },
+    { name: 'Restaurant Eén', city: 'Utrecht', latitude: 52.0908, longitude: 5.1222, open_days: [1, 2, 3, 4, 5], sections: ['Warm', 'Koud'] },
     { name: 'Bistro Twee' } ], copy_products_from: ID.hth, copy_suppliers: true };
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select create_organization($1::jsonb)`, [JSON.stringify(p)])), /Not allowed/);
   const r = await as(db, U['admin@platform'], async ({ one }) => (await one(`select create_organization($1::jsonb) r`, [JSON.stringify(p)])).r);
@@ -579,7 +579,8 @@ test('new organization in one step: platform admin only, restaurants, sections a
   assert.equal(r.sections, 2);
   const src = (await db.query(`select count(*)::int n from products where organization_id = $1 and deleted_at is null and is_active`, [ID.hth])).rows[0].n;
   assert.equal(r.products, src);
-  const rest = (await db.query(`select open_days from restaurants where organization_id = $1 and name = 'Restaurant Eén'`, [r.id])).rows[0];
+  const rest = (await db.query(`select open_days, latitude from restaurants where organization_id = $1 and name = 'Restaurant Eén'`, [r.id])).rows[0];
+  assert.equal(Number(rest.latitude), 52.0908);
   assert.deepEqual(rest.open_days.map(Number), [1, 2, 3, 4, 5]);
   const org = (await db.query(`select default_language, is_demo from organizations where id = $1`, [r.id])).rows[0];
   assert.equal(org.default_language, 'nl'); assert.equal(org.is_demo, false);

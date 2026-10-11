@@ -1,7 +1,7 @@
 // Settings › Organizations (platform admin): the list, and a new organization in one form:
 // name and language, restaurants with open days and sections, a copy of an existing product list
 // and suppliers, and the first admin who gets an invitation by e-mail.
-import { state, api, esc, toast, toastError, openModal } from './core.js';
+import { state, api, esc, toast, toastError, openModal, formHtml, bindPlaceFields } from './core.js';
 import { t, lang } from './i18n.js';
 
 const day = (d, style = 'short') => new Intl.DateTimeFormat(lang() === 'en' ? 'en-GB' : 'nl-NL', { weekday: style }).format(new Date(Date.UTC(2026, 0, 4 + d)));
@@ -33,7 +33,8 @@ function switchTo(id) {
 
 const restRow = (i, r = {}) => `<div class="ow-rest" data-r="${i}">
   <div class="field-row"><div class="field"><label>${t('name')}</label><input data-k="name" value="${esc(r.name || '')}" placeholder="${t('ow_rest_ph')}"></div>
-    <div class="field"><label>${t('city')}</label><input data-k="city" value="${esc(r.city || '')}"></div></div>
+    </div>
+  ${formHtml([{ name: 'city', label: t('place_label'), type: 'place', placeholder: t('place_ph') }], {})}
   <div class="field"><label>${t('open_days')}</label><div class="ow-days">${[1, 2, 3, 4, 5, 6, 7].map((d) =>
     `<label class="ow-day"><input type="checkbox" data-day="${d}" ${(r.open_days || [1, 2, 3, 4, 5]).includes(d) ? 'checked' : ''}><span>${day(d)}</span></label>`).join('')}</div></div>
   <div class="field"><label>${t('ow_sections')}</label><input data-k="sections" value="${esc(r.sections || '')}" placeholder="${t('ow_sections_ph')}"></div>
@@ -64,7 +65,8 @@ function wizard(orgs, done) {
     document.getElementById('modal').onclick = null;
     const rests = card.querySelector('#ow-rests');
     const bindRm = () => rests.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => b.closest('.ow-rest').remove()));
-    card.querySelector('#ow-add-rest').onclick = () => { rests.insertAdjacentHTML('beforeend', restRow(n++)); bindRm(); rests.lastElementChild.querySelector('input').focus(); };
+    bindPlaceFields(rests);
+    card.querySelector('#ow-add-rest').onclick = () => { rests.insertAdjacentHTML('beforeend', restRow(n++)); bindRm(); bindPlaceFields(rests.lastElementChild); rests.lastElementChild.querySelector('input').focus(); };
     const copy = card.querySelector('#ow-copy');
     const syncCopy = () => { card.querySelector('#ow-src').disabled = !copy.checked; card.querySelector('#ow-sups').disabled = !copy.checked; };
     copy.onchange = syncCopy; syncCopy();
@@ -73,7 +75,9 @@ function wizard(orgs, done) {
       if (!name) { toast(t('ow_need_name'), 'error'); card.querySelector('#ow-name').focus(); return; }
       const restaurants = [...rests.querySelectorAll('.ow-rest')].map((r) => ({
         name: r.querySelector('[data-k="name"]').value.trim(),
-        city: r.querySelector('[data-k="city"]').value.trim(),
+        city: r.querySelector('[name="city"]').value.trim(),
+        latitude: Number(r.querySelector('[name="latitude"]').value) || null,
+        longitude: Number(r.querySelector('[name="longitude"]').value) || null,
         open_days: [...r.querySelectorAll('[data-day]:checked')].map((x) => Number(x.dataset.day)),
         sections: r.querySelector('[data-k="sections"]').value.split(',').map((x) => x.trim()).filter(Boolean),
       })).filter((r) => r.name);

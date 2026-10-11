@@ -125,6 +125,16 @@ export function formHtml(fields, values = {}) {
       return `<div class="field"><label>${esc(f.label)}</label>${f.options.map((o) =>
         `<label class="check"><input type="checkbox" name="${f.name}" value="${esc(o.value)}" ${set.has(String(o.value)) ? 'checked' : ''}> ${esc(o.label)}</label>`).join('')}</div>`;
     }
+    if (f.type === 'place') {
+      // Place search: type a city or village, pick it from the list; fills the coordinates for the weather
+      const lat = values.latitude; const lon = values.longitude;
+      return `<div class="field place-field"><label>${esc(f.label)}</label>
+        <div class="place-row"><input name="${f.name}" value="${esc(v ?? '')}" placeholder="${esc(f.placeholder || '')}" autocomplete="off">
+          <button type="button" class="btn-sm" data-place-search>${esc(t('place_search'))}</button></div>
+        <div class="place-results"></div>
+        <div class="small muted place-coords">${lat != null && lon != null ? `&#128205; ${esc(t('place_set', { c: v || '' }))}` : esc(t('place_none'))}</div>
+        <input type="hidden" name="latitude" value="${esc(lat ?? '')}"><input type="hidden" name="longitude" value="${esc(lon ?? '')}"></div>`;
+    }
     if (f.type === 'textarea') {
       return `<div class="field"><label>${esc(f.label)}</label><textarea name="${f.name}" rows="3" ${req}>${esc(v ?? '')}</textarea></div>`;
     }
@@ -137,6 +147,12 @@ export function readForm(root, fields) {
   const out = {};
   for (const f of fields) {
     if (f.type === 'multiselect') { out[f.name] = $$(`input[name="${f.name}"]:checked`, root).map((i) => Number(i.value)); continue; }
+    if (f.type === 'place') {
+      const num = (n) => { const x = root.querySelector(`[name="${n}"]`); return x && x.value !== '' ? Number(x.value) : null; };
+      out[f.name] = (root.querySelector(`[name="${f.name}"]`)?.value || '').trim() || null;
+      out.latitude = num('latitude'); out.longitude = num('longitude');
+      continue;
+    }
     const el = root.querySelector(`[name="${f.name}"]`);
     if (!el) continue;
     if (f.type === 'checkbox') { out[f.name] = el.checked; continue; }
@@ -186,3 +202,39 @@ function resizeCharts() {
 }
 window.addEventListener('beforeprint', resizeCharts);
 window.addEventListener('afterprint', resizeCharts);
+
+// Place search for forms with a 'place' field (Open-Meteo geocoding: free, no key, place names worldwide)
+export function bindPlaceFields(root) {
+  root.querySelectorAll('.place-field').forEach((box) => {
+    const input = box.querySelector('input[type="text"], input:not([type])');
+    const results = box.querySelector('.place-results');
+    const coords = box.querySelector('.place-coords');
+    const set = (lat, lon, label) => {
+      box.querySelector('[name="latitude"]').value = lat ?? '';
+      box.querySelector('[name="longitude"]').value = lon ?? '';
+      coords.innerHTML = lat != null ? `&#128205; ${esc(t('place_set', { c: label }))}` : esc(t('place_none'));
+    };
+    const search = async () => {
+      const q = input.value.trim();
+      if (q.length < 2) return;
+      results.innerHTML = '<span class="spinner"></span>';
+      try {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=${lang() === 'en' ? 'en' : 'nl'}&format=json`);
+        const list = ((await res.json()).results || []);
+        if (!list.length) { results.innerHTML = `<div class="small muted">${esc(t('place_nothing'))}</div>`; return; }
+        results.innerHTML = list.map((p, i) => `<button type="button" class="place-hit" data-i="${i}"><strong>${esc(p.name)}</strong>
+          <span class="small muted">${esc([p.admin1, p.country].filter(Boolean).join(', '))}</span></button>`).join('');
+        results.querySelectorAll('.place-hit').forEach((b) => (b.onclick = () => {
+          const p = list[Number(b.dataset.i)];
+          input.value = p.name;
+          set(Math.round(p.latitude * 10000) / 10000, Math.round(p.longitude * 10000) / 10000, p.name);
+          results.innerHTML = '';
+        }));
+      } catch { results.innerHTML = `<div class="small muted">${esc(t('place_error'))}</div>`; }
+    };
+    box.querySelector('[data-place-search]').onclick = search;
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); } });
+    // Typing a different name clears the old coordinates until a new place is picked
+    input.addEventListener('input', () => set(null, null));
+  });
+}
