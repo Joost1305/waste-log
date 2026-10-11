@@ -383,6 +383,33 @@ route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', 
 })));
 
 // Signed link to a best-practice attachment
+// ------------------------------------------------------------------ invoices
+// Upload the file (PDF or photo), let the AI read the lines, the manager checks them, save_invoice stores it all.
+route('GET', '/invoices', async () => check(await sb.rpc('invoices_list', { p_org: ctx.orgId })));
+route('GET', '/invoices/:id', async ({ p }) => {
+  const d = check(await sb.rpc('invoice_get', { p_id: num(p.id), p_org: ctx.orgId }));
+  if (!d) throw new ApiError(404, 'Invoice not found');
+  return d;
+});
+route('POST', '/invoices/file', async ({ form }) => {
+  const file = form.get('file');
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `org-${ctx.orgId}/invoices/${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from('invoices').upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new ApiError(400, /row-level security/i.test(error.message) ? 'No permission to upload invoices'
+    : /mime|type/i.test(error.message) ? 'Only PDF files and photos (JPG, PNG, WebP)' : /size|large/i.test(error.message) ? 'File is larger than 15 MB' : error.message);
+  return { path, name: file.name, type: file.type };
+});
+route('POST', '/invoices/read', async ({ body }) => invoke('read-invoice', { organization_id: ctx.orgId, path: body.path, table_text: body.table_text }));
+route('POST', '/invoices', async ({ body }) => check(await sb.rpc('save_invoice', { p: body, p_org: ctx.orgId })));
+route('PATCH', '/invoices/:id', async ({ p, body }) => check(await sb.rpc('save_invoice', { p: { ...body, id: num(p.id) }, p_org: ctx.orgId })));
+route('DELETE', '/invoices/:id', async ({ p }) => check(await sb.rpc('delete_invoice', { p_id: num(p.id), p_org: ctx.orgId })));
+export async function invoiceUrl(path) {
+  const { data, error } = await sb.storage.from('invoices').createSignedUrl(path, 600);
+  if (error) throw new ApiError(404, 'File not found');
+  return data.signedUrl;
+}
+
 export async function documentUrl(path) {
   const { data, error } = await sb.storage.from('documents').createSignedUrl(path, 600);
   if (error) throw new ApiError(404, 'File not found');

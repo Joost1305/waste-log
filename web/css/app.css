@@ -418,3 +418,34 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 
 .forgot-row { text-align: center; margin-top: 10px; }
 .link-btn { background: none; border: 0; padding: 4px; color: var(--primary); text-decoration: underline; font-weight: 600; min-height: 0; }
+
+/* invoices: check the lines */
+.modal-card:has(.inv-modal) { max-width: 980px; }
+.inv-wait { text-align: center; padding: 20px 6px; }
+.inv-wait .spinner { width: 30px; height: 30px; }
+.inv-head { flex-wrap: wrap; }
+.inv-head .field { flex: 1 1 150px; }
+.inv-lines-head, .inv-line { display: grid; grid-template-columns: 28px minmax(160px, 2fr) minmax(150px, 1.6fr) 80px 90px 86px; gap: 8px; align-items: start; }
+.inv-lines-head { padding: 0 4px 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; font-size: .72rem; }
+.inv-line { padding: 8px 4px; border-top: 1px solid var(--line); }
+.inv-line.off { opacity: .45; }
+.inv-line input, .inv-line select { width: 100%; padding: 7px 9px; font-size: .9rem; }
+.inv-inc { padding-top: 8px; }
+.inv-num label { display: none; }
+.inv-ppk { padding-top: 9px; white-space: nowrap; }
+.inv-low { color: var(--accent); font-weight: 600; margin-top: 3px; }
+.inv-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+@media (max-width: 760px) {
+  .inv-lines-head { display: none; }
+  .inv-line { grid-template-columns: 26px 1fr 1fr; grid-template-areas: "inc desc desc" ". prod prod" ". kg eur" ". ppk ppk"; border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 8px; padding: 10px; }
+  .inv-inc { grid-area: inc; } .inv-desc { grid-area: desc; } .inv-prod { grid-area: prod; }
+  .inv-kg { grid-area: kg; } .inv-eur { grid-area: eur; }
+  .inv-ppk { grid-area: ppk; padding-top: 0; }
+  .inv-num label { display: block; font-size: .72rem; color: var(--ink-3); }
+}
+
+/* help: green "?" */
+.help-q { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff;
+  font-weight: 800; font-size: 1.05rem; text-decoration: none; box-shadow: 0 0 0 3px var(--primary-soft); flex-shrink: 0; line-height: 1; }
+.help-q:hover { filter: brightness(1.1); color: #fff; }
+.help-q-sm { width: 26px; height: 26px; font-size: .9rem; vertical-align: middle; margin-left: 6px; position: relative; top: -2px; }

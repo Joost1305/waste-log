@@ -56,7 +56,7 @@ export async function renderRegister() {
   app().className = 'app narrow';
   if (!state.meta.restaurants.length) { app().innerHTML = `<div class="card empty">${t('no_data')}</div>`; return; }
   app().innerHTML = `
-    <div class="page-head"><h1>${t('reg_title')}</h1></div>
+    <div class="page-head"><h1>${t('reg_title')} <a class="help-q help-q-sm" href="help/staff.html#register" title="${t('help')}" aria-label="${t('help')}">?</a></h1></div>
     <form class="reg" id="reg" novalidate>
       <div id="sec-restaurant"></div>
       <section class="step" id="sec-photo"></section>

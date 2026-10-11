@@ -509,3 +509,62 @@ test('dashboard: waste per section for restaurants with sections', async () => {
   assert.ok(row && Number(row.kg) >= 2 && row.restaurant);
   await db.query(`update sections set deleted_at = now() where id = $1`, [sec.rows[0].id]);
 });
+
+test('invoices: manager saves an invoice, waste of that product gets the invoice price, delete undoes it', async () => {
+  const U2 = U['manager.amsterdam@hth'];
+  // A fresh product without any invoices yet
+  const prod = (await as(db, U2, ({ one }) => one(`insert into products (name, waste_category_id, purchase_price_per_kg) values ('Testtomaat', $1, 2) returning id`, [ID.prepared]))).id;
+  // A tomato registration today, valued at the product price first
+  const rec = await as(db, U['student@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_id: prod, reason_id: ID.spoilage, weight_kg: 2 })));
+  assert.notEqual(rec.valuation_method, 'invoice');
+  // Students cannot save invoices
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`select save_invoice($1::jsonb)`,
+    [JSON.stringify({ invoice_date: new Date().toISOString().slice(0, 10), items: [{ description: 'Tomaten', product_id: prod, quantity_kg: 10, line_total: 30 }] })])), /Not allowed/);
+  const res = await as(db, U2, async ({ one }) => (await one(`select save_invoice($1::jsonb) r`, [JSON.stringify({
+    restaurant_id: ID.ams, supplier_name: 'Groenteman Test', invoice_number: 'F-1', invoice_date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+    total_amount: 42, items: [
+      { description: 'Tomaten tros 10 kg', product_id: prod, quantity: 1, unit: 'doos', quantity_kg: 10, line_total: 35 },
+      { description: 'Statiegeld', line_total: 7 },
+    ] })])).r);
+  assert.equal(res.lines, 2);
+  assert.equal(res.priced, 1);
+  assert.ok(res.revalued >= 1);
+  const after = (await db.query(`select valuation_method, unit_cost_per_kg, purchase_value from waste_records where id = $1`, [rec.id])).rows[0];
+  assert.equal(after.valuation_method, 'invoice');
+  assert.equal(Number(after.unit_cost_per_kg), 3.5);
+  assert.equal(Number(after.purchase_value), 7);
+  // The supplier was created by name and the product price follows the invoice
+  assert.equal((await db.query(`select purchase_price_per_kg p from products where id = $1`, [prod])).rows[0].p * 1, 3.5);
+  const list = await as(db, U2, async ({ one }) => (await one(`select invoices_list() l`)).l);
+  const row = list.find((x) => x.id === res.id);
+  assert.equal(row.supplier, 'Groenteman Test');
+  assert.equal(row.priced, 1);
+  // The Hague manager does not see an Amsterdam invoice
+  const other = await as(db, U['manager.denhaag@hth'], async ({ one }) => (await one(`select invoices_list() l`)).l);
+  assert.ok(!other.some((x) => x.id === res.id));
+  // Another organization cannot read it
+  const bistro = await as(db, U['admin@bistro'], async ({ one }) => (await one(`select invoice_get($1) g`, [res.id])).g);
+  assert.equal(bistro, null);
+  // Delete: the registration goes back to a non-invoice price, audit log not flooded
+  const auditBefore = (await db.query(`select count(*)::int n from audit_log where entity = 'waste_records'`)).rows[0].n;
+  await as(db, U2, ({ q }) => q(`select delete_invoice($1)`, [res.id]));
+  const back = (await db.query(`select valuation_method from waste_records where id = $1`, [rec.id])).rows[0];
+  assert.notEqual(back.valuation_method, 'invoice');
+  assert.equal((await db.query(`select count(*)::int n from audit_log where entity = 'waste_records'`)).rows[0].n, auditBefore);
+});
+
+test('invoices: editing replaces the old version and keeps the file', async () => {
+  const U2 = U['manager.amsterdam@hth'];
+  const day = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  const r1 = await as(db, U2, async ({ one }) => (await one(`select save_invoice($1::jsonb) r`, [JSON.stringify({
+    restaurant_id: ID.ams, invoice_date: day, file_path: `org-${ID.hth}/x/test.pdf`, items: [{ description: 'Uien 5 kg', quantity_kg: 5, line_total: 6 }] })])).r);
+  const r2 = await as(db, U2, async ({ one }) => (await one(`select save_invoice($1::jsonb) r`, [JSON.stringify({
+    id: r1.id, restaurant_id: ID.ams, invoice_date: day, items: [{ description: 'Uien 5 kg', quantity_kg: 5, line_total: 7 }] })])).r);
+  assert.notEqual(r2.id, r1.id);
+  const list = await as(db, U2, async ({ one }) => (await one(`select invoices_list() l`)).l);
+  assert.ok(!list.some((x) => x.id === r1.id));
+  assert.equal(list.find((x) => x.id === r2.id).file_path, `org-${ID.hth}/x/test.pdf`);
+  // A file from another organization's folder is refused
+  await assert.rejects(as(db, U2, ({ q }) => q(`select save_invoice($1::jsonb)`, [JSON.stringify({
+    restaurant_id: ID.ams, invoice_date: day, file_path: 'org-999/x.pdf', items: [{ description: 'x', line_total: 1 }] })])), /Invalid file/);
+});

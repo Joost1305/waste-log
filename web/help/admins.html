@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WASTE log: how to use the app (managers and admins)</title>
+<link rel="icon" href="../img/icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --green: #2F5D50; --green-soft: #E3ECE8; --cream: #F4EFE4; --paper: #FBF9F4; --ink: #1F2A26; --ink-2: #55625D;
+  --line: #E4DED2; --accent: #B8744A; --warn: #FFF4D6;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 20px 64px; }
+header.hero { background: var(--green); color: #fff; padding: 36px 0 30px; margin-bottom: 28px; }
+header.hero .wrap { padding-bottom: 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .02em; opacity: .9; font-size: .9rem; text-transform: uppercase; }
+.brand svg { width: 30px; height: 30px; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 14px 0 8px; }
+.hero p { margin: 0; max-width: 640px; opacity: .92; }
+.tag { display: inline-block; background: rgba(255,255,255,.16); border-radius: 999px; padding: 3px 12px; font-size: .78rem; font-weight: 600; margin-top: 14px; }
+nav.toc { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; margin-bottom: 28px; }
+nav.toc strong { display: block; margin-bottom: 6px; }
+nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 28px; }
+nav.toc a { color: var(--green); text-decoration: none; }
+nav.toc a:hover { text-decoration: underline; }
+section { margin: 0 0 34px; scroll-margin-top: 16px; }
+h2 { font-size: 1.35rem; margin: 0 0 10px; padding-top: 6px; border-top: 3px solid var(--green-soft); }
+h3 { font-size: 1.05rem; margin: 20px 0 6px; }
+p { margin: 0 0 10px; }
+a { color: var(--green); }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 12px 0; }
+.steps > li { counter-increment: s; position: relative; padding: 12px 14px 12px 54px; background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+.steps > li::before { content: counter(s); position: absolute; left: 14px; top: 12px; width: 28px; height: 28px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: .9rem; }
+.steps > li strong:first-child { display: block; }
+.tip, .note, .warn { border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+.tip { background: var(--green-soft); }
+.note { background: var(--cream); }
+.warn { background: var(--warn); }
+.tip::before { content: "Tip  "; font-weight: 700; color: var(--green); }
+.warn::before { content: "Watch out  "; font-weight: 700; color: var(--accent); }
+.ui { display: inline-block; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 0 7px; font-size: .9em; font-weight: 600; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 10px 0; font-size: .94rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--cream); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+tr:last-child td { border-bottom: 0; }
+td.y { color: var(--green); font-weight: 700; text-align: center; }
+td.n { color: #B9B2A5; text-align: center; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.card h3 { margin-top: 0; }
+.check { list-style: none; padding: 0; }
+.check li { padding-left: 28px; position: relative; margin: 6px 0; }
+.check li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border: 2px solid var(--green); border-radius: 4px; }
+details { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 8px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 6px; }
+.timeline { border-left: 3px solid var(--green-soft); margin: 12px 0 12px 8px; padding-left: 20px; }
+.timeline > div { position: relative; margin-bottom: 16px; }
+.timeline > div::before { content: ""; position: absolute; left: -28px; top: 5px; width: 13px; height: 13px; border-radius: 50%; background: var(--green); }
+.timeline .when { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+.draft { background: var(--accent); color: #fff; text-align: center; font-size: .8rem; font-weight: 700; letter-spacing: .05em; padding: 6px; }
+footer { color: var(--ink-2); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 40px; }
+@media (max-width: 640px) {
+  h1 { font-size: 1.6rem; }
+  nav.toc ol { columns: 1; }
+  .grid2 { grid-template-columns: 1fr; }
+  table { font-size: .86rem; }
+  th, td { padding: 7px 8px; }
+}
+@media print {
+  .draft, nav.toc { display: none; }
+  header.hero { background: none; color: var(--ink); padding: 0; }
+  body { background: #fff; }
+  section { break-inside: avoid-page; }
+}
+
+.backbar { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); }
+.backbar .wrap { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; }
+.backbar a { font-weight: 700; text-decoration: none; }
+.backbar .muted { color: var(--ink-2); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="backbar"><div class="wrap"><a href="../#/settings">&#8249; Back to Settings</a><span class="muted small">WASTE log help</span></div></div>
+<header class="hero"><div class="wrap">
+  <div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#F4EFE4"/><path d="M32 13c-9 8-14 16-14 24a14 14 0 0 0 28 0c0-8-5-16-14-24z" fill="#2F5D50"/><path d="M32 22v29M32 34l-6-5M32 41l7-6" stroke="#F4EFE4" stroke-width="3" stroke-linecap="round" fill="none"/></svg> WASTE log</div>
+  <h1>How to use the app</h1>
+  <p>For kitchen managers and organisation admins: setting up, reading the numbers and turning them into less waste.</p>
+  <span class="tag">Managers and admins</span>
+</div></header>
+
+<div class="wrap">
+<nav class="toc"><strong>On this page</strong><ol>
+  <li><a href="#roles">Roles: who can do what</a></li>
+  <li><a href="#setup">First setup, in order</a></li>
+  <li><a href="#users">Users and access</a></li>
+  <li><a href="#products">Products, prices and CO₂</a></li>
+  <li><a href="#dashboard">Reading the dashboard</a></li>
+  <li><a href="#records">Records, photos and corrections</a></li>
+  <li><a href="#improve">Interventions and best practices</a></li>
+  <li><a href="#leaderboard">The leaderboard</a></li>
+  <li><a href="#share">Sharing results</a></li>
+  <li><a href="#data">Data, export and audit log</a></li>
+  <li><a href="#routine">A weekly routine that works</a></li>
+  <li><a href="#faq">Questions</a></li>
+</ol></nav>
+
+<section id="roles">
+  <h2>1. Roles: who can do what</h2>
+  <table>
+    <tr><th></th><th>Employee / student</th><th>Restaurant manager</th><th>Organisation admin</th></tr>
+    <tr><td>Register waste, see own records, gallery, Improve page</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+    <tr><td>Dashboard and all records of their restaurants</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td></tr>
+    <tr><td>Correct or delete anyone's registrations</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td></tr>
+    <tr><td>Products, suppliers, invoices, dishes, guests per day</td><td class="n">·</td><td class="y">✓</td><td class="y">✓</td></tr>
+    <tr><td>Users, restaurants, targets, organisation settings</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td></tr>
+    <tr><td>Weekly e-mail, leaderboard settings, audit log</td><td class="n">·</td><td class="n">·</td><td class="y">✓</td></tr>
+  </table>
+  <p>Employees and managers only see the restaurants that are ticked for them. Organisation admins always see all restaurants of the organisation.</p>
+</section>
+
+<section id="setup">
+  <h2>2. First setup, in order</h2>
+  <p>Everything is under <span class="ui">Settings</span>. On a phone, Settings is a list; tap an item to open it. Doing it in this order saves you going back and forth.</p>
+  <ol class="steps">
+    <li><strong>Organisation</strong>Name, currency, language and the <em>default value per kg</em>: the price used for waste that has no price of its own.</li>
+    <li><strong>Restaurants</strong>One per kitchen or outlet. Set the city (for weather), the <em>open days</em> (so "per day" figures ignore days you are closed) and whether the public impact page is on.</li>
+    <li><strong>Sections</strong> (optional, Settings › Leaderboard)Counters or stations inside a restaurant, for example Grill, Salad bar, Pizza &amp; pasta. Staff pick their section when they register; the dashboard then shows waste per section.</li>
+    <li><strong>Products</strong>The list staff choose from. Check the prices; see chapter 4.</li>
+    <li><strong>Suppliers and dishes</strong> (optional)Only if you want waste per supplier or per dish.</li>
+    <li><strong>Invoices</strong> (recommended)Upload recent supplier invoices so the waste is valued at real prices.</li>
+    <li><strong>Guests per day</strong> (recommended)Fill in covers per restaurant per day. Without guests you only see kilos; with guests you see grams per guest, the fairest number to compare over time.</li>
+    <li><strong>Users</strong>Invite your team; see chapter 3.</li>
+    <li><strong>Targets</strong>Set a reduction target per restaurant or for the whole organisation, per week, month or year. Tip: first register 2 to 4 weeks to know your starting point.</li>
+    <li><strong>Weekly e-mail</strong>Every Monday the numbers of last week go to the addresses you enter, per restaurant.</li>
+  </ol>
+</section>
+
+<section id="users">
+  <h2>3. Users and access</h2>
+  <ol class="steps">
+    <li><strong>Add a person</strong>Settings › Users › <span class="ui">+ Add</span>. Fill in name, e-mail, role and language.</li>
+    <li><strong>Choose restaurants</strong>All restaurants are ticked by default. Untick the ones this person should not see.</li>
+    <li><strong>Invite</strong>Keep <span class="ui">Send an invitation by email</span> ticked. The person gets a link and chooses their own password. You never need to know it.</li>
+  </ol>
+  <ul>
+    <li><strong>Forgot password:</strong> people can use <span class="ui">Forgot your password?</span> on the sign-in page, or you tap <span class="ui">Reset link</span> next to their name.</li>
+    <li><strong>Leaving staff:</strong> untick <span class="ui">Active</span> or delete them. Their registrations stay. If you add the same e-mail address later, the old account comes back.</li>
+    <li><strong>Students per block:</strong> invite a new group at the start of a block, deactivate the previous group at the end.</li>
+  </ul>
+</section>
+
+<section id="products">
+  <h2>4. Products, prices and CO₂</h2>
+  <h3>The product list</h3>
+  <p>Products are groups that make sense in a kitchen ("Bread", "Lettuce &amp; salad leaves"), not every article number. Each product has a Dutch and English name, a category, a price per kg and a CO₂ value per kg.</p>
+  <ul>
+    <li><strong>Import:</strong> you can import products from an Excel file, for example an export from your recipe or purchasing system.</li>
+    <li><strong>Missing products:</strong> when staff type a name that is not on the list, it shows up under <span class="ui">Missing products</span>. Add it as a new product or link it to an existing one; past registrations are linked too.</li>
+    <li><strong>≈ before a price</strong> means the price is an estimate (the typical price in that category). Replace it with your own price when you know it.</li>
+  </ul>
+  <h3>How waste gets its value</h3>
+  <table>
+    <tr><th>Order</th><th>Source</th><th>When</th></tr>
+    <tr><td>1</td><td>Invoice price</td><td>Average price per kg of that product on supplier invoices from the last 90 days (Settings › Invoices).</td></tr>
+    <tr><td>2</td><td>Product price</td><td>The price per kg on the product in Settings.</td></tr>
+    <tr><td>3</td><td>Default value</td><td>The organisation's default value per kg, when the product has no price.</td></tr>
+  </table>
+  <p>Tap the <strong>Waste cost</strong> card on the dashboard to see exactly how the amount was calculated and which share uses real prices.</p>
+  <h3>Supplier invoices</h3>
+  <p>Real invoice prices make the waste cost precise. Settings › <span class="ui">Invoices</span>:</p>
+  <ol class="steps">
+    <li><strong>Upload</strong>Tap <span class="ui">+ Upload invoice</span> and choose the PDF, a photo of a paper invoice, or an Excel/CSV export from the supplier's web shop. Reading takes up to a minute.</li>
+    <li><strong>Check every line</strong>The app suggests the product, the kilos and the amount per line. Lines marked <em>Please check</em> deserve a second look. Non-food lines (deposit, delivery) are unticked. Kilos are the total net weight of the line: 2 boxes of 5 kg is 10 kg; 1 litre counts as 1 kg.</li>
+    <li><strong>Save</strong>Lines with a product, kilos and an amount give a price per kg. Waste of those products from the invoice date up to 90 days later is revalued straight away, and the product price is updated (untick the option if you do not want that).</li>
+  </ol>
+  <p>Made a mistake? Tap <span class="ui">Edit</span> next to the invoice; deleting an invoice gives the waste its previous price again. You can also type an invoice in by hand.</p>
+  <h3>CO₂</h3>
+  <p>CO₂ values come from the RIVM <em>Database milieubelasting voedingsmiddelen</em> (2024, CC BY 4.0), per product where a good match exists, otherwise the average of the category. Tap the <strong>CO₂</strong> card on the dashboard for the source per product. The figures cover production up to and including distribution; cooking and waste processing are not included, so they are on the low side.</p>
+</section>
+
+<section id="dashboard">
+  <h2>5. Reading the dashboard</h2>
+  <p>Choose a restaurant (or all) and a period at the top. Every number compares with the previous period of the same length.</p>
+  <table>
+    <tr><th>Block</th><th>What it tells you</th></tr>
+    <tr><td>Total waste, Waste cost, Per guest, CO₂</td><td>The headline numbers. Tap Waste cost or CO₂ for the calculation and sources.</td></tr>
+    <tr><td>Target</td><td>How you are doing against the target for its own period.</td></tr>
+    <tr><td>Trend and trend per guest</td><td>Kilos and grams per guest over time. Per guest is the one to watch: busy weeks always produce more kilos.</td></tr>
+    <tr><td>By category and by reason</td><td>What and why. Reasons point to the solution: overproduction asks for different planning than spoilage.</td></tr>
+    <tr><td>Per restaurant and per section</td><td>Where. The section table shows each counter's share of its restaurant, plus registrations without a section.</td></tr>
+    <tr><td>Supplier, dish, top products</td><td>The most concrete starting points for a conversation with the team or a supplier.</td></tr>
+  </table>
+  <p>Use <span class="ui">Print</span> for a meeting or <span class="ui">Export to Excel</span> to work with the numbers yourself.</p>
+  <div class="warn">The numbers are as good as the registrations. Look at the number of registrations and the share of registrations with a photo before drawing conclusions.</div>
+</section>
+
+<section id="records">
+  <h2>6. Records, photos and corrections</h2>
+  <ul>
+    <li><strong>Records:</strong> all registrations of your restaurants, with filters for period, restaurant, category and reason. Edit or delete single items, or tick several and delete them at once.</li>
+    <li><strong>Gallery:</strong> the photos, heaviest first. Show the top photos of the week in the team briefing; it works better than any chart.</li>
+    <li><strong>Spot checks:</strong> once a week, scan for odd weights (a typo of 50 kg instead of 5.0 kg) and correct them.</li>
+  </ul>
+</section>
+
+<section id="improve">
+  <h2>7. Interventions and best practices</h2>
+  <p>Under <span class="ui">Improve</span> you write down every change you try, and the app measures the effect.</p>
+  <ol class="steps">
+    <li><strong>Start an intervention</strong><span class="ui">New intervention</span>: what you change ("Soup in two smaller batches"), why, the restaurant, the start date and optionally a focus (only bread, only one reason).</li>
+    <li><strong>Let it run</strong>After 7 days the app compares the period before and after: per guest when guest counts are filled in, otherwise per open day. Other restaurants in the same weeks serve as a comparison.</li>
+    <li><strong>Check the effect</strong>Tap <span class="ui">Before / after</span> for the result and a weekly chart. With few registrations the app warns that the percentage is only an indication.</li>
+    <li><strong>Share what works</strong>Turn a successful intervention into a best practice, with a photo or PDF, so other kitchens can copy it.</li>
+  </ol>
+</section>
+
+<section id="leaderboard">
+  <h2>8. The leaderboard</h2>
+  <p>Optional, switched on in Settings › Leaderboard. Sections compete on <em>good registering and good ideas</em>, not on who throws away the least (that would only encourage hiding waste).</p>
+  <ul>
+    <li><strong>Points for:</strong> registering on open days, quality (photo, weighed), prevention ideas, ideas the admin adopts, and improvement compared with the previous four weeks.</li>
+    <li><strong>Prevention question:</strong> after saving, staff are asked how it could have been prevented. You review ideas: <span class="ui">Adopt</span> or <span class="ui">Not now</span>.</li>
+    <li><strong>Winner:</strong> at the end of the week or month, choose the winner; it goes into the hall of fame.</li>
+    <li><strong>Kitchen screen:</strong> a large-screen version for a TV or tablet in the kitchen.</li>
+    <li><strong>Switched off:</strong> no question after saving, no points and no leaderboard page. Sections stay in use for the dashboard.</li>
+  </ul>
+</section>
+
+<section id="share">
+  <h2>9. Sharing results</h2>
+  <ul>
+    <li><strong>Weekly e-mail:</strong> kilos, value, per guest, top 3 products, reasons, target and running interventions, every Monday, per restaurant, to as many addresses as you like. Use <span class="ui">Preview</span> to see it first.</li>
+    <li><strong>Public impact page:</strong> switch it on per restaurant (Settings › Restaurants) for a page you can show to guests, for example via a QR code on the menu. It shows totals and trends, never names.</li>
+  </ul>
+</section>
+
+<section id="data">
+  <h2>10. Data, export and audit log</h2>
+  <ul>
+    <li><strong>Data export</strong> (Settings): one Excel file with every registration, guest counts, summaries, products, suppliers, dishes and targets. Use it for research, reports or your own backup.</li>
+    <li><strong>Audit log</strong> (Settings): who changed what and when. Useful when a number suddenly looks different.</li>
+  </ul>
+</section>
+
+<section id="routine">
+  <h2>11. A weekly routine that works</h2>
+  <div class="grid2">
+    <div class="card"><h3>Every day (2 minutes)</h3><ul class="check">
+      <li>Did every section register today?</li>
+      <li>Remind the shift in the briefing</li>
+    </ul></div>
+    <div class="card"><h3>Every Monday (15 minutes)</h3><ul class="check">
+      <li>Read the weekly e-mail or dashboard</li>
+      <li>Correct odd registrations</li>
+      <li>Pick the top product or reason of the week</li>
+      <li>Agree one change and start it as an intervention</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="faq">
+  <h2>12. Questions</h2>
+  <details><summary>The waste cost seems too high or too low.</summary><p>Tap the Waste cost card. If a large share uses the default value, add prices to the products that are thrown away most.</p></details>
+  <details><summary>Per guest shows a dash.</summary><p>No guest counts are filled in for that period. Add them in Settings › Guests per day.</p></details>
+  <details><summary>A section is missing on the registration screen.</summary><p>Check Settings › Leaderboard › Sections for that restaurant. Sections show for every restaurant that has them, also with the leaderboard switched off.</p></details>
+  <details><summary>Someone cannot sign in.</summary><p>Check in Settings › Users that the person is active, then send a reset link. Invitation and reset e-mails sometimes land in spam.</p></details>
+  <details><summary>Can I try things without touching real data?</summary><p>Ask your WASTE log contact about a demo environment. Settings always apply to the organisation shown at the top.</p></details>
+</section>
+
+<footer>WASTE log · How to use the app (managers and admins)</footer>
+</div>
+</body>
+</html>

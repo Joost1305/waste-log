@@ -5,6 +5,7 @@ import { t, LANGS, lang } from '../i18n.js';
 import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
 import { openMissingProducts } from '../missing-products.js';
+import { renderInvoices } from '../invoices.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
 
@@ -48,6 +49,7 @@ function sections() {
       columns: [[t('name'), (r) => esc(r.name)], [t('contact'), (r) => esc(r.contact || '')]],
       fields: () => [{ name: 'name', label: t('name'), required: true }, { name: 'contact', label: t('contact') }],
     },
+    p.catalog && { key: 'invoices', title: t('inv_title'), custom: renderInvoices },
     p.catalog && {
       key: 'menu', title: t('set_menu'), endpoint: '/menu-items', canEdit: true, reloadMeta: true,
       columns: [
@@ -149,13 +151,17 @@ function sections() {
   ].filter(Boolean);
 }
 
+// Where the "?" in Settings jumps to in the admin help page
+const HELP_ANCHOR = { products: '#products', invoices: '#products', suppliers: '#setup', menu: '#setup', covers: '#setup', targets: '#setup',
+  restaurants: '#setup', users: '#users', weekly: '#share', leaderboard: '#leaderboard', export: '#data', audit: '#data', organization: '#setup' };
+
 export async function renderSettings(rest) {
   const list = sections();
   const chosen = list.find((s) => s.key === rest[0]);
   const current = chosen || list[0];
   // Phone: without a chosen section only the list shows; with one, only that section plus a back link
   app().innerHTML = `
-    <div class="page-head"><h1>${t('set_title')}</h1></div>
+    <div class="page-head"><h1>${t('set_title')} <a class="help-q help-q-sm" href="help/admins.html${HELP_ANCHOR[current.key] || ''}" title="${t('help_admin')}" aria-label="${t('help_admin')}">?</a></h1></div>
     <div class="settings ${chosen ? 'has-section' : 'menu-only'}">
       <nav class="settings-nav">${list.map((s) => `<a href="#/settings/${s.key}" class="${s === current ? 'active' : ''}">${s.title}</a>`).join('')}</nav>
       <div class="settings-main"><a href="#/settings" class="settings-back">&#8249; ${t('set_title')}</a><div id="set-body"></div></div>
