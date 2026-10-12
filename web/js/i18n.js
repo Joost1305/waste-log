@@ -179,6 +179,7 @@ const dict = {
     imp_xls: 'This is an old .xls file. Open it in Excel and save it as .xlsx (or CSV), then try again.',
     imp_price_note: 'Prices are read as price per kg. Prices per box or per piece give wrong waste values; leave the price column empty in that case and the default value per kg is used.',
     imp_done: '{c} products added, {u} updated, {s} new suppliers',
+    sc_audit_show: 'Show', sc_audit_hide: 'Hide', sc_audit_sub: 'Every change in this organization, the latest 200 first.',
     sc_title: 'System check', sc_sub: 'Every morning around 06:25 the app tests its own connections, before the kitchens start. When something is red, GitHub e-mails you.',
     sc_run: 'Run now', sc_running: 'Checking…', sc_done: 'Check finished', sc_none: 'No check has run yet. Tap Run now.',
     sc_st_ok: 'works', sc_st_warn: 'worth a look', sc_st_fail: 'broken',
@@ -204,6 +205,7 @@ const dict = {
     sc_f_deleted_at: 'deleted', sc_f_language: 'language',
   },
   nl: {
+    sc_audit_show: 'Tonen', sc_audit_hide: 'Verbergen', sc_audit_sub: 'Elke wijziging in deze organisatie, de laatste 200 eerst.',
     sc_title: 'Systeemcheck', sc_sub: 'Elke ochtend rond 06:25 test de app zijn eigen verbindingen, voordat de keukens beginnen. Staat er iets op rood, dan mailt GitHub je.',
     sc_run: 'Nu controleren', sc_running: 'Bezig…', sc_done: 'Controle klaar', sc_none: 'Er is nog geen controle gedaan. Tik op Nu controleren.',
     sc_st_ok: 'werkt', sc_st_warn: 'even kijken', sc_st_fail: 'kapot',

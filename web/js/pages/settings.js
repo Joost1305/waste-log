@@ -143,7 +143,8 @@ function sections() {
     p.dashboard && { key: 'leaderboard', title: t('set_leaderboard'), custom: renderLeaderboardSettings },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
-    p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
+    // The platform admin finds the audit log inside System check; organization admins keep their own tab
+    p.audit && state.user.role !== 'super_admin' && { key: 'audit', title: t('set_audit'), custom: renderAudit },
     p.organizations && { key: 'organizations', title: t('set_orgs'), custom: renderOrganizations },
     state.user.role === 'super_admin' && { key: 'system', title: t('sc_title'), custom: renderSystemCheck },
   ].filter(Boolean);
@@ -378,6 +379,9 @@ async function renderSystemCheck(el, pick) {
       <div class="page-actions"><button class="btn-sm" id="sc-all">${t('sc_all', { n: fmt.num(cur.changes_all) })}</button></div></div>
       <p class="small muted" style="margin-top:0">${t('sc_changes_sub', { from: fmt.dateTime(cur.window_from), to: fmt.dateTime(cur.window_to) })}</p>
       ${cur.changes.length ? `<ul class="sc-changes">${scChangeList(cur.changes)}</ul>` : `<div class="empty">${t('sc_no_changes')}</div>`}</div>
+    <div class="card"><div class="page-head" style="margin-bottom:0"><h2 style="margin:0">${t('set_audit')}</h2>
+      <div class="page-actions"><button class="btn-sm" id="sc-audit">${t('sc_audit_show')}</button></div></div>
+      <p class="small muted" style="margin:6px 0 0">${t('sc_audit_sub')}</p><div id="sc-audit-body"></div></div>
     <div class="card"><h2>${t('sc_history')}</h2><div class="table-wrap"><table><tbody>
       ${rows.map((r) => {
         const f = r.checks.filter((c) => c.status === 'fail').length; const w = r.checks.filter((c) => c.status === 'warn').length;
@@ -388,6 +392,12 @@ async function renderSystemCheck(el, pick) {
       }).join('')}</tbody></table></div></div>`;
   bindRun();
   $$('[data-sc]', el).forEach((b) => (b.onclick = () => renderSystemCheck(el, Number(b.dataset.sc))));
+  $('#sc-audit', el).onclick = async (e) => {
+    const box = $('#sc-audit-body', el);
+    if (box.innerHTML) { box.innerHTML = ''; e.target.textContent = t('sc_audit_show'); return; }
+    box.innerHTML = '<span class="spinner"></span>';
+    try { await renderAudit(box, true); e.target.textContent = t('sc_audit_hide'); } catch (err) { box.innerHTML = ''; toastError(err); }
+  };
   $('#sc-all', el).onclick = async () => {
     openModal(`<div class="card empty"><span class="spinner"></span></div>`);
     let all = [];
@@ -596,9 +606,9 @@ function renderExport(el) {
   };
 }
 
-async function renderAudit(el) {
+async function renderAudit(el, bare = false) {
   const rows = (await api('/audit', { query: { limit: 200 } })).data;
-  el.innerHTML = `<div class="card"><h2>${t('set_audit')}</h2><div class="table-wrap"><table><thead><tr>
+  el.innerHTML = `<div class="${bare ? '' : 'card'}">${bare ? '' : `<h2>${t('set_audit')}</h2>`}<div class="table-wrap" style="${bare ? 'margin-top:10px' : ''}"><table><thead><tr>
     <th>${t('when')}</th><th>${t('user')}</th><th>${t('action')}</th><th>${t('entity')}</th><th></th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td class="nowrap small">${fmt.dateTime(r.created_at)}</td><td>${esc(r.user_name || '–')}</td>
       <td><span class="badge">${esc(r.action)}</span></td><td>${esc(r.entity)} ${r.entity_id ? '#' + r.entity_id : ''}</td>
