@@ -40,18 +40,17 @@ Users and roles can only be changed through the `admin-users` edge function, whi
 permissions. Photos are private and only reachable through short-lived signed links. Every
 change is written to an audit log. `npm test` runs the isolation tests against the real migrations.
 
-## Demo accounts (password `demo1234`)
+## Demo accounts (local demo seed, password `demo1234`)
 
 | Role | Email |
 |---|---|
-| Organization Admin | `orgadmin@hth.demo` |
 | Manager Amsterdam (Amsterdam Restaurant, Brasserie ZINQ) | `manager.amsterdam@hth.demo` |
 | Manager Den Haag (The Hague Restaurant, Le Début) | `manager.denhaag@hth.demo` |
 | Student (Amsterdam Restaurant) | `student@hth.demo` |
 | Super Admin | `admin@platform.demo` |
 | Other organization, for isolation checks | `admin@bistro.demo` |
 
-These are the passwords from the demo seed. On the live app the shared student try-out login (`student@hth.demo`) uses the password shown on the sign-in page.
+These passwords only apply to a fresh local database built from `supabase/seed/demo.sql`. They do not work on the live app. The live sign-in page has one shared student try-out login, `student@hth.demo`, with the password shown on its button.
 
 All demo records are flagged and the app shows a **DEMO DATA** banner.
 
