@@ -2,8 +2,10 @@ import { api, app, esc, toast, toastError, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { SHOW_DEMO_LOGINS } from '../config.js';
 
-// Two demo logins on the sign-in page; one tap fills in the account and signs in (password demo1234)
-const DEMO = [{ email: 'orgadmin@hth.demo', label: 'demo_admin' }, { email: 'student@hth.demo', label: 'demo_student' }];
+// Shared student try-out login: one tap fills in the account and signs in
+const TRY = { email: 'student@hth.demo', password: 'nofoodwaste' };
+// Own accounts: one tap fills in the e-mail, the person types their own password
+const OWN = [{ name: 'Joost de Vos', email: 'j.de.vos@hotelschool.nl' }];
 
 export function renderLogin(onSuccess) {
   app().className = 'app';
@@ -17,16 +19,17 @@ export function renderLogin(onSuccess) {
         <div class="field"><label>${t('password')}</label><input type="password" name="password" autocomplete="current-password" required></div>
         <button class="btn-primary btn-xl" type="submit">${t('sign_in')}</button>
         <div class="forgot-row"><button type="button" class="link-btn" id="forgot-btn">${t('forgot_pw')}</button></div>
-        <div class="demo-accounts" hidden>${t('demo_accounts')}<br>
-          <button type="button" class="btn-sm own-login" data-own="j.de.vos@hotelschool.nl"><strong>Joost de Vos</strong><span>j.de.vos@hotelschool.nl · ${t('own_login_hint')}</span></button>
-          <div class="demo-btns">${DEMO.map((d) => `<button type="button" class="btn-sm" data-demo="${esc(d.email)}"><strong>${t(d.label)}</strong><span>${esc(d.email)}</span></button>`).join('')}</div></div>
+        <div class="demo-accounts" hidden>
+          ${OWN.map((o) => `<button type="button" class="btn-sm own-login" data-own="${esc(o.email)}"><strong>${esc(o.name)}</strong><span>${esc(o.email)} · ${t('own_login_hint')}</span></button>`).join('')}
+          <div class="small muted" style="margin-top:10px">${t('try_student')}</div>
+          <button type="button" class="btn-sm own-login" data-demo="${esc(TRY.email)}"><strong>${t('demo_student')}</strong><span>${esc(TRY.email)} · ${t('try_pw', { p: TRY.password })}</span></button></div>
       </form>
     </div>`;
   const form = document.getElementById('login-form');
   renderLangToggle(document.getElementById('login-lang'));
   form.querySelector('.demo-accounts').hidden = !SHOW_DEMO_LOGINS;
   form.querySelectorAll('[data-demo]').forEach((b) => (b.onclick = () => {
-    form.email.value = b.dataset.demo; form.password.value = 'demo1234'; form.requestSubmit();
+    form.email.value = b.dataset.demo; form.password.value = TRY.password; form.requestSubmit();
   }));
   // Own account: fills in the e-mail only; the password stays private (the phone's password manager can fill it)
   form.querySelectorAll('[data-own]').forEach((b) => (b.onclick = () => {

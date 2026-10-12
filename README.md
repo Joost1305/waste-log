@@ -51,6 +51,8 @@ change is written to an audit log. `npm test` runs the isolation tests against t
 | Super Admin | `admin@platform.demo` |
 | Other organization, for isolation checks | `admin@bistro.demo` |
 
+These are the passwords from the demo seed. On the live app the shared student try-out login (`student@hth.demo`) uses the password shown on the sign-in page.
+
 All demo records are flagged and the app shows a **DEMO DATA** banner.
 
 ## Going live with a real kitchen
