@@ -1,8 +1,9 @@
-// Daily job, called once a day by a GitHub Action:
+// Scheduled job, called every hour by a GitHub Action:
 // 1. keeps the free Supabase project active (any request counts as activity);
 // 2. stores yesterday's and today's weather (Open-Meteo, no key) for every restaurant with coordinates;
-// 3. sends the weekly impact e-mails for last week (Monday to Sunday) that have not gone out yet.
-//    The first run on Monday sends them; if that run was missed, the next day's run catches up.
+// 3. sends the weekly impact e-mails whose moment has come: on the ticked weekdays (or the dates picked
+//    in the calendar) from the chosen hour, at most once per list per day. A missed run is caught up
+//    by the next hourly run on the same day.
 // It is idempotent and only fetches what is missing, so calling it more often does no harm.
 import { admin, cors, json } from '../_shared/common.ts';
 import { mailConfig, renderReport, sendMail } from '../_shared/report.ts';
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
       synced += rows.length;
     } catch (e) { errors.push(`restaurant ${r.id}: ${(e as Error).message}`); }
   }
-  // Weekly e-mails (each list once per week; the database keeps track of what was sent)
+  // Weekly e-mails (each list at most once per day; the database keeps track of what was sent)
   let mails = 0;
   const cfg = mailConfig();
   const { data: due, error: dueErr } = await sb.rpc('weekly_reports_due');

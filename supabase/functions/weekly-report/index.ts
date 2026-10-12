@@ -1,8 +1,8 @@
 // Weekly impact e-mail from the app (Settings › Weekly e-mail):
 //   { action: 'preview', id }            -> { html, subject, recipients, mail_ready }
-//   { action: 'send', id, to: 'me'|'list' } -> sends last week's e-mail to yourself or to the whole list
+//   { action: 'send', id, to: 'me'|'list' } -> sends the e-mail (the 7 days before today) to yourself or to the whole list
 // Access is checked by the database: the report is read with the caller's own rights (RLS),
-// so managers only reach the lists of their own restaurants. The Monday send runs in the daily job.
+// so managers only reach the lists of their own restaurants. Scheduled sending runs in the hourly job.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { admin, caller, cors, fail, json } from '../_shared/common.ts';
 import { mailConfig, renderReport, sendMail } from '../_shared/report.ts';

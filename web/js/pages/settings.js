@@ -329,9 +329,10 @@ async function renderWeekly(el) {
     if (s.last_sent_week) return `<span class="badge green">&#10003; ${t('wk_last', { d: fmt.date(s.last_sent_at) })}</span>`;
     return `<span class="badge green">${t('wk_on')}</span>`;
   };
-  $('#wk-list', el).innerHTML = `<div class="table-wrap"><table><thead><tr><th>${t('restaurant')}</th><th>${t('wk_recipients')}</th><th>${t('language')}</th><th>${t('status')}</th><th></th></tr></thead><tbody>
+  $('#wk-list', el).innerHTML = `<div class="table-wrap"><table><thead><tr><th>${t('restaurant')}</th><th>${t('wk_recipients')}</th><th>${t('wk_when_col')}</th><th>${t('language')}</th><th>${t('status')}</th><th></th></tr></thead><tbody>
     ${rows.map((r, i) => `<tr><td><strong>${esc(r.name)}</strong></td>
       <td class="small">${r.sub && r.sub.recipients.length ? `${esc(r.sub.recipients.slice(0, 2).join(', '))}${r.sub.recipients.length > 2 ? ` +${r.sub.recipients.length - 2}` : ''}` : '<span class="muted">–</span>'}</td>
+      <td class="small">${r.sub ? scheduleLabel(r.sub) : ''}</td>
       <td>${r.sub ? r.sub.language.toUpperCase() : ''}</td><td>${status(r.sub)}</td>
       <td class="actions"><button class="btn-sm" data-wk="${i}">${r.sub ? t('edit') : t('wk_setup')}</button></td></tr>`).join('')}
     </tbody></table></div>
@@ -348,6 +349,16 @@ function editWeekly(row, reload) {
         <div class="small muted">${t('wk_recipients_help')}</div></div>
       <div class="field"><label>${t('language')}</label><select name="language">
         ${['en', 'nl'].map((l) => `<option value="${l}" ${(s ? s.language : (state.meta.organization.default_language || 'en')) === l ? 'selected' : ''}>${LANGS[l] || l}</option>`).join('')}</select></div>
+      <fieldset class="wk-when"><legend>${t('wk_when_col')}</legend>
+        <div class="chips" role="group" aria-label="${t('wk_when_col')}">
+          <button type="button" class="chip" data-mode="weekly">${t('wk_mode_weekly')}</button>
+          <button type="button" class="chip" data-mode="dates">${t('wk_mode_dates')}</button></div>
+        <div id="wk-weekly" class="wk-days">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label class="wk-day"><input type="checkbox" value="${d}"><span>${weekdayName(d, 'short')}</span></label>`).join('')}</div>
+        <div id="wk-dates"><div id="wk-cal"></div><p class="small muted" id="wk-dates-info"></p></div>
+        <div class="field" style="margin-top:10px"><label for="wk-hour">${t('wk_hour')}</label>
+          <select id="wk-hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, '0')}:00</option>`).join('')}</select></div>
+        <p class="small muted" style="margin:6px 0 0">${t('wk_period_note')}</p>
+      </fieldset>
       <div class="field"><label class="check"><input type="checkbox" name="is_active" ${!s || s.is_active ? 'checked' : ''}> ${t('wk_active')}</label></div>
       ${s && s.last_status ? `<p class="small muted">${t('wk_last_status')}: ${esc(s.last_status === 'no_mail_service' ? t('wk_no_mail') : s.last_status)}</p>` : ''}
       <div class="err" id="wk-err"></div>
@@ -356,11 +367,67 @@ function editWeekly(row, reload) {
           <button type="button" class="btn-sm" id="wk-prev">${t('wk_preview')}</button>` : ''}
         <button type="button" data-close>${t('cancel')}</button><button class="btn-primary">${t('save')}</button></div>
     </form>`, (card, close) => {
+    // Schedule: ticked weekdays, or dates picked in the calendar (the calendar replaces the weekdays)
+    const sch = {
+      mode: s ? s.schedule_mode || 'weekly' : 'weekly',
+      days: new Set(s && s.send_days && s.send_days.length ? s.send_days.map(Number) : [1]),
+      dates: new Set(s && s.send_dates ? s.send_dates : []),
+      month: todayIso().slice(0, 7),
+    };
+    $('#wk-hour', card).value = String(s && s.send_hour != null ? s.send_hour : 7);
+    $$('#wk-weekly input', card).forEach((c) => { c.checked = sch.days.has(Number(c.value)); c.onchange = () => { if (c.checked) sch.days.add(Number(c.value)); else sch.days.delete(Number(c.value)); }; });
+    const showMode = () => {
+      $$('[data-mode]', card).forEach((b) => { b.classList.toggle('on', b.dataset.mode === sch.mode); b.setAttribute('aria-pressed', String(b.dataset.mode === sch.mode)); });
+      $('#wk-weekly', card).hidden = sch.mode !== 'weekly';
+      $('#wk-dates', card).hidden = sch.mode !== 'dates';
+      if (sch.mode === 'dates') drawCal();
+    };
+    const drawCal = () => {
+      const [y, m] = sch.month.split('-').map(Number);
+      const first = new Date(y, m - 1, 1);
+      const offset = (first.getDay() + 6) % 7;           // Monday first
+      const daysIn = new Date(y, m, 0).getDate();
+      const today = todayIso();
+      const iso = (d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const title = new Intl.DateTimeFormat(lang() === 'en' ? 'en-GB' : 'nl-NL', { month: 'long', year: 'numeric' }).format(first);
+      const cells = [...Array(offset).fill('<span></span>'), ...Array.from({ length: daysIn }, (_, i) => {
+        const d = iso(i + 1); const on = sch.dates.has(d); const past = d < today;
+        return `<button type="button" class="wk-cal-day ${on ? 'on' : ''} ${d === today ? 'today' : ''}" data-date="${d}" aria-pressed="${on}" ${past ? 'disabled' : ''}>${i + 1}</button>`;
+      })];
+      $('#wk-cal', card).innerHTML = `<div class="wk-cal-head">
+          <button type="button" class="btn-sm btn-ghost" data-cal="-1" aria-label="${t('wk_prev_month')}">&#8249;</button>
+          <strong>${esc(title)}</strong>
+          <button type="button" class="btn-sm btn-ghost" data-cal="1" aria-label="${t('wk_next_month')}">&#8250;</button></div>
+        <div class="wk-cal-grid">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<span class="wk-cal-wd">${weekdayName(d, 'narrow')}</span>`).join('')}${cells.join('')}</div>`;
+      $$('[data-cal]', card).forEach((b) => (b.onclick = () => {
+        const d = new Date(y, m - 1 + Number(b.dataset.cal), 1);
+        sch.month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; drawCal();
+      }));
+      $$('[data-date]', card).forEach((b) => (b.onclick = () => {
+        if (sch.dates.has(b.dataset.date)) sch.dates.delete(b.dataset.date); else sch.dates.add(b.dataset.date);
+        drawCal();
+      }));
+      const ahead = [...sch.dates].filter((d) => d >= today).sort();
+      $('#wk-dates-info', card).innerHTML = ahead.length
+        ? `${t('wk_dates_n', { n: ahead.length })}: ${ahead.slice(0, 6).map((d) => esc(fmt.date(d + 'T12:00:00'))).join(', ')}${ahead.length > 6 ? ' …' : ''}
+           · <button type="button" class="link-btn" id="wk-clear">${t('wk_clear')}</button>`
+        : t('wk_dates_none');
+      const clr = $('#wk-clear', card);
+      if (clr) clr.onclick = () => { sch.dates = new Set([...sch.dates].filter((d) => d < today)); drawCal(); };
+    };
+    $$('[data-mode]', card).forEach((b) => (b.onclick = () => { sch.mode = b.dataset.mode; showMode(); }));
+    showMode();
+
     const read = () => {
       const recipients = $('[name=recipients]', card).value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
       const bad = recipients.find((x) => !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(x));
       if (bad) throw new Error(t('wk_bad', { e: bad }));
-      return { recipients, language: $('[name=language]', card).value, is_active: $('[name=is_active]', card).checked };
+      if (sch.mode === 'weekly' && !sch.days.size) throw new Error(t('wk_need_day'));
+      if (sch.mode === 'dates' && ![...sch.dates].some((d) => d >= todayIso())) throw new Error(t('wk_need_date'));
+      return { recipients, language: $('[name=language]', card).value, is_active: $('[name=is_active]', card).checked,
+        schedule_mode: sch.mode, send_days: [...sch.days].sort(), send_hour: Number($('#wk-hour', card).value),
+        // past dates are dropped when saving: they have done their job
+        send_dates: [...sch.dates].filter((d) => d >= todayIso()).sort() };
     };
     $('#wk-form', card).onsubmit = async (e) => {
       e.preventDefault();
@@ -442,6 +509,19 @@ async function renderAudit(el) {
     ${rows.map((r) => `<tr><td class="nowrap small">${fmt.dateTime(r.created_at)}</td><td>${esc(r.user_name || '–')}</td>
       <td><span class="badge">${esc(r.action)}</span></td><td>${esc(r.entity)} ${r.entity_id ? '#' + r.entity_id : ''}</td>
       <td class="small muted">${esc((r.details || '').slice(0, 120))}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+// Short description of a list's schedule, for the overview table
+function scheduleLabel(sub) {
+  const hour = `${String(sub.send_hour ?? 7).padStart(2, '0')}:00`;
+  if (sub.schedule_mode === 'dates') {
+    const ahead = (sub.send_dates || []).filter((d) => d >= todayIso()).sort();
+    if (!ahead.length) return `<span class="badge warn">${t('wk_dates_none_short')}</span>`;
+    return `${t('wk_next', { d: esc(fmt.date(ahead[0] + 'T12:00:00')) })} · ${hour}${ahead.length > 1 ? ` <span class="muted">(+${ahead.length - 1})</span>` : ''}`;
+  }
+  const d = (sub.send_days || [1]).map(Number).sort();
+  const days = d.length === 7 ? t('open_every_day') : d.map((x) => weekdayName(x, 'short')).join(', ');
+  return `${esc(days)} · ${hour}`;
 }
 
 // Weekday names in the current language (ISO: 1 = Monday)

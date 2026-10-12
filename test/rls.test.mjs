@@ -369,12 +369,16 @@ test('weekly e-mail: recipients cleaned and checked, own restaurants only, repor
     `insert into report_subscriptions (restaurant_id, recipients) values ($1, '{a@b.nl}')`, [ID.ams])));
   const org = await as(db, U['orgadmin@hth'], ({ one }) => one(
     `insert into report_subscriptions (restaurant_id, recipients) values (null, '{director@hth.nl}') returning id`));
-  // Preview: last full week, restaurant scope
+  // Preview: the 7 days before today, restaurant scope
   const p = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select weekly_report_preview($1) p', [s.id])).p);
   assert.equal(p.scope, 'restaurant');
   assert.equal(p.restaurant, 'Amsterdam Restaurant');
-  const wk = (await db.query(`select (date_trunc('week', current_date)::date - 7)::text d`)).rows[0].d;
+  const wk = (await db.query(`select (app.local_date(now()) - 7)::text d`)).rows[0].d;
   assert.equal(p.week_from, wk);
+  // A Monday still gives the classic week, Monday to Sunday
+  const mon = (await db.query(`select (date_trunc('week', current_date)::date - 7)::text d`)).rows[0].d;
+  const pm = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select weekly_report_preview($1, $2::date) p', [s.id, mon])).p);
+  assert.equal(pm.week_to, (await db.query(`select ($1::date + 6)::text d`, [mon])).rows[0].d);
   const kg = (await db.query(`select coalesce(sum(weight_kg),0) kg from waste_records where restaurant_id = $1 and deleted_at is null
      and app.local_date(recorded_at) between $2::date and $2::date + 6`, [ID.ams, wk])).rows[0].kg;
   assert.ok(Math.abs(p.this_week.kg - Number(kg)) < 0.05);
@@ -385,11 +389,32 @@ test('weekly e-mail: recipients cleaned and checked, own restaurants only, repor
   const other = await as(db, U['manager.denhaag@hth'], async ({ one }) => (await one('select weekly_report_preview($1) p', [s.id])).p);
   assert.equal(other, null);
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q('select weekly_reports_due()')));
+  const dueIds = async () => (await db.query('select weekly_reports_due() d')).rows[0].d.map((d) => d.subscription_id);
+  const today = (await db.query(`select extract(isodow from now() at time zone 'Europe/Amsterdam')::int d,
+    (now() at time zone 'Europe/Amsterdam')::date::text t`)).rows[0];
+  const otherDay = today.d === 7 ? 1 : today.d + 1;
+  // Schedule: ticked days and an hour (Amsterdam time)
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set send_days = $2, send_hour = 0 where id = $1`, [s.id, [otherDay]]));
+  assert.ok(!(await dueIds()).includes(s.id), 'not on a day that is not ticked');
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set send_days = $2, send_hour = 23 where id = $1`, [s.id, [today.d, otherDay, otherDay, 9]]));
+  const days = (await db.query('select send_days from report_subscriptions where id = $1', [s.id])).rows[0].send_days;
+  assert.deepEqual(days, [today.d, otherDay].sort((a, b) => a - b), 'days are cleaned: no doubles, only 1 to 7');
+  const hourNow = (await db.query(`select extract(hour from now() at time zone 'Europe/Amsterdam')::int h`)).rows[0].h;
+  if (hourNow < 23) assert.ok(!(await dueIds()).includes(s.id), 'not before the chosen hour');
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set send_hour = 0 where id = $1`, [s.id]));
   const due = (await db.query('select weekly_reports_due() d')).rows[0].d;
   assert.ok(due.some((d) => d.subscription_id === s.id && d.language === 'nl'));
+  await assert.rejects(as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set send_days = '{}' where id = $1`, [s.id])), /at least one day/);
   await db.query('select weekly_report_mark($1, $2, $3)', [s.id, wk, 'sent']);
-  const due2 = (await db.query('select weekly_reports_due() d')).rows[0].d;
-  assert.ok(!due2.some((d) => d.subscription_id === s.id), 'sent once per week');
+  assert.ok(!(await dueIds()).includes(s.id), 'sent once per day');
+  // Calendar: only the chosen dates count, the ticked days are ignored
+  await db.query(`update report_subscriptions set last_sent_on = null where id = $1`, [s.id]);
+  const tomorrow = (await db.query(`select ($1::date + 1)::text d`, [today.t])).rows[0].d;
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set schedule_mode = 'dates', send_dates = $2 where id = $1`,
+    [s.id, [tomorrow]]));
+  assert.ok(!(await dueIds()).includes(s.id), 'calendar without today');
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update report_subscriptions set send_dates = array_append(send_dates, $2::date) where id = $1`, [s.id, today.t]));
+  assert.ok((await dueIds()).includes(s.id), 'calendar with today');
 });
 
 test('leaderboard: switch, sections, prevention ideas, points and winners', async () => {

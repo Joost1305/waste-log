@@ -467,3 +467,20 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .place-results { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .place-hit { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 8px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .place-coords { margin-top: 6px; }
+
+/* Weekly e-mail schedule: day ticks and a small month calendar */
+.wk-when { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; min-width: 0; }
+.wk-when legend { font-weight: 700; padding: 0 6px; }
+.wk-days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.wk-day { position: relative; }
+.wk-day input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.wk-day span { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; font-weight: 600; cursor: pointer; background: var(--surface); }
+.wk-day input:checked + span { background: var(--primary); border-color: var(--primary); color: #fff; }
+.wk-day input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wk-cal-head { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px; text-transform: capitalize; }
+.wk-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.wk-cal-wd { text-align: center; font-size: .75rem; color: var(--ink-2); text-transform: uppercase; }
+.wk-cal-day { min-height: 40px; padding: 0; border-radius: 10px; font-weight: 600; }
+.wk-cal-day.today { box-shadow: inset 0 0 0 2px var(--primary); }
+.wk-cal-day.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.wk-cal-day:disabled { opacity: .35; cursor: default; }
