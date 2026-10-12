@@ -38,17 +38,23 @@ function freshState(keep = {}) {
     photo: null, // { url, token, uploading, ai: 'thinking'|'done'|'off'|'fail', suggestion }
     productId: null, productName: '', categoryId: null, search: '',
     weight: '', weightSource: 'manual', reasonId: null,
-    menuItemId: null, supplierId: null, location: '', moment: defaultMoment(), note: '', when: '',
+    menuItemId: null, supplierId: null, location: '', note: '', when: '', editWhen: false,
     saving: false,
   };
 }
 
-function defaultMoment() {
-  const h = new Date().getHours();
-  if (h < 11) return 'breakfast';
-  if (h < 16) return 'lunch';
-  if (h < 22) return 'dinner';
-  return 'closing';
+// The moment follows from the time of the registration, nobody has to pick it:
+// breakfast until 10:30, lunch until 14:00 (the 10:30-11:30 prep counts as lunch), dinner after that.
+function momentFor(d) {
+  const m = d.getHours() * 60 + d.getMinutes();
+  if (m < 10 * 60 + 30) return 'breakfast';
+  if (m < 14 * 60) return 'lunch';
+  return 'dinner';
+}
+const whenDate = () => (s.when ? new Date(s.when) : new Date());
+function localInputValue(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export async function renderRegister() {
@@ -377,21 +383,28 @@ function renderMore() {
   const menu = meta.menu_items.filter((m) => !m.restaurant_id || m.restaurant_id === s.restaurantId);
   const opt = (list, cur, lab = (x) => x.name) => `<option value="">${t('none')}</option>` +
     list.map((x) => `<option value="${x.id ?? x}" ${String(x.id ?? x) === String(cur ?? '') ? 'selected' : ''}>${esc(lab(x))}</option>`).join('');
+  const d = whenDate();
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const whenLabel = !s.when ? t('reg_now') : (localInputValue(d).slice(0, 10) === todayIso() ? hm : fmt.dateTime(d.toISOString()));
   $('#more-body').innerHTML = `
     <div class="field-row">
       <div class="field"><label>${t('reg_menu_item')}</label><select id="m-menu">${opt(menu, s.menuItemId)}</select></div>
       <div class="field"><label>${t('reg_supplier')}</label><select id="m-supplier">${opt(meta.suppliers, s.supplierId)}</select></div>
       <div class="field"><label>${t('reg_location')}</label><select id="m-location">${opt(meta.locations, s.location, (x) => t('loc_' + x))}</select></div>
-      <div class="field"><label>${t('reg_moment')}</label><select id="m-moment">${opt(meta.moments, s.moment, (x) => t('mom_' + x))}</select></div>
     </div>
     <div class="field"><label>${t('reg_note')}</label><input id="m-note" maxlength="1000" value="${esc(s.note)}"></div>
-    <div class="field"><label>${t('reg_when')}</label><input id="m-when" type="datetime-local" value="${esc(s.when)}" max="${todayIso()}T23:59"></div>`;
+    <div class="small muted when-line">&#128337; ${t('mom_' + momentFor(d))} · ${esc(whenLabel)}
+      ${s.editWhen ? '' : ` · <button type="button" class="link-btn" id="m-when-edit">${t('reg_when_change')}</button>`}</div>
+    ${s.editWhen ? `<div class="field" style="margin-top:8px"><label>${t('reg_when')}</label>
+      <input id="m-when" type="datetime-local" value="${esc(s.when || localInputValue(d))}" max="${todayIso()}T23:59"></div>` : ''}`;
   $('#m-menu').onchange = (e) => (s.menuItemId = e.target.value ? Number(e.target.value) : null);
   $('#m-supplier').onchange = (e) => (s.supplierId = e.target.value ? Number(e.target.value) : null);
   $('#m-location').onchange = (e) => (s.location = e.target.value);
-  $('#m-moment').onchange = (e) => (s.moment = e.target.value);
   $('#m-note').oninput = (e) => (s.note = e.target.value);
-  $('#m-when').onchange = (e) => (s.when = e.target.value);
+  const edit = $('#m-when-edit');
+  if (edit) edit.onclick = () => { s.editWhen = true; renderMore(); $('#m-when').focus(); };
+  const when = $('#m-when');
+  if (when) when.onchange = (e) => { s.when = e.target.value; renderMore(); };
 }
 
 // ------------------------------------------------------------------ save
@@ -449,7 +462,7 @@ async function save() {
     menu_item_id: s.menuItemId,
     supplier_id: s.supplierId,
     location: s.location || null,
-    moment: s.moment || null,
+    moment: momentFor(whenDate()),
     note: s.note || null,
     photo_path: s.photo && s.photo.token ? s.photo.token : null,
     weight_source: s.weightSource,
