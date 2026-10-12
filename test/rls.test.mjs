@@ -615,3 +615,36 @@ test('new organization in one step: platform admin only, restaurants, sections a
   const seen = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select count(*)::int n from restaurants where organization_id = $1`, [r.id])).n);
   assert.equal(seen, 0);
 });
+
+test('system check: change log keeps old and new values, important changes, gaps', async () => {
+  const prod = (await db.query(`select id, purchase_price_per_kg from products where organization_id = $1 and deleted_at is null order by id limit 1`, [ID.hth])).rows[0];
+  const t0 = (await db.query('select now() - interval \'1 second\' t')).rows[0].t;
+  await db.query(`update organizations set is_demo = false where id = $1`, [ID.hth]);
+  try {
+    await as(db, U['orgadmin@hth'], ({ q }) => q(`update products set purchase_price_per_kg = 99.5 where id = $1`, [prod.id]));
+    const log = (await db.query(`select details from audit_log where entity = 'products' and entity_id = $1 order by id desc limit 1`, [String(prod.id)])).rows[0].details;
+    assert.deepEqual(log.changes.purchase_price_per_kg.map(Number), [Number(prod.purchase_price_per_kg), 99.5]);
+    // An update that changes nothing writes no log line
+    const n1 = (await db.query(`select count(*)::int n from audit_log`)).rows[0].n;
+    await as(db, U['orgadmin@hth'], ({ q }) => q(`update products set purchase_price_per_kg = 99.5 where id = $1`, [prod.id]));
+    assert.equal((await db.query(`select count(*)::int n from audit_log`)).rows[0].n, n1);
+    // Registrations are not "important"; a price change is
+    const inp = (await db.query(`select system_check_inputs($1, now() + interval '1 minute') i`, [t0])).rows[0].i;
+    assert.ok(inp.changes.some((c) => c.entity === 'products' && c.changes && c.changes.purchase_price_per_kg));
+    assert.ok(!inp.changes.some((c) => c.entity === 'waste_records'));
+    assert.ok(inp.changes_all >= 1);
+    // Gap: an active product without a price
+    await db.query(`update products set purchase_price_per_kg = null where id = $1`, [prod.id]);
+    const gaps = (await db.query(`select system_check_inputs(now(), now()) i`)).rows[0].i.gaps;
+    assert.ok(gaps.some((g) => g.key === 'no_price' && g.count >= 1));
+  } finally {
+    await db.query(`update products set purchase_price_per_kg = $2 where id = $1`, [prod.id, prod.purchase_price_per_kg]);
+    await db.query(`update organizations set is_demo = true where id = $1`, [ID.hth]);
+  }
+  // Only the platform admin sees results; users cannot call the inputs
+  await db.query(`insert into system_checks (status, window_from, window_to) values ('ok', now() - interval '1 day', now())`);
+  assert.equal((await as(db, U['orgadmin@hth'], ({ q }) => q('select * from system_checks'))).length, 0);
+  assert.ok((await as(db, U['admin@platform'], ({ q }) => q('select * from system_checks'))).length >= 1);
+  await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_inputs(now(), now())`)));
+  await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_all_changes(1)`)), /Not allowed/);
+});

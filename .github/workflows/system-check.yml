@@ -1,0 +1,37 @@
+# Morning system check: tests all connections of the app before the kitchens start.
+# Result: Settings › System check in the app. When something is red this job fails,
+# and GitHub sends a "workflow failed" e-mail (Settings › Notifications › Actions on github.com).
+name: Morning system check
+
+on:
+  schedule:
+    - cron: '25 4 * * *'   # 04:25 UTC = 06:25 in Amsterdam in summer, 05:25 in winter
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/system-check.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the system check
+        run: |
+          set -o pipefail
+          curl -fsS --retry 3 --retry-delay 30 --max-time 120 -X POST \
+            "https://melrcbypzdndyixevdqp.supabase.co/functions/v1/system-check" \
+            -H "Content-Type: application/json" -d '{}' > result.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('result.json')).get('data', {})
+          status = d.get('status')
+          print(f"Overall: {status}")
+          for c in d.get('checks', []):
+              print(f"  {c['status']:<5} {c['key']:<11} {c['detail']}")
+          print(f"Important changes: {len(d.get('changes', []))} (all changes: {d.get('changes_all', 0)})")
+          for g in d.get('gaps', []):
+              print(f"  gap: {g.get('key')} {g.get('org')} {g.get('items')}")
+          if status == 'fail':
+              print("::error::The system check found a problem. Open Settings > System check in the app.")
+              sys.exit(1)
+          PY

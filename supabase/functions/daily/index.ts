@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
       synced += rows.length;
     } catch (e) { errors.push(`restaurant ${r.id}: ${(e as Error).message}`); }
   }
-  // Weekly e-mails (each list at most once per day; the database keeps track of what was sent)
+  // Weekly e-mails (each list at most once per day; the database keeps track of what was sent).
+  // Asking for the due lists also records that this job ran (heartbeat for the morning system check).
   let mails = 0;
   const cfg = mailConfig();
   const { data: due, error: dueErr } = await sb.rpc('weekly_reports_due');
