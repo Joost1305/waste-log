@@ -47,10 +47,9 @@ change is written to an audit log. `npm test` runs the isolation tests against t
 | Manager Amsterdam (Amsterdam Restaurant, Brasserie ZINQ) | `manager.amsterdam@hth.demo` |
 | Manager Den Haag (The Hague Restaurant, Le Début) | `manager.denhaag@hth.demo` |
 | Student (Amsterdam Restaurant) | `student@hth.demo` |
-| Super Admin | `admin@platform.demo` |
 | Other organization, for isolation checks | `admin@bistro.demo` |
 
-These passwords only apply to a fresh local database built from `supabase/seed/demo.sql`. They do not work on the live app. The live sign-in page has one shared student try-out login, `student@hth.demo`, with the password shown on its button.
+On the live app these accounts only reach the Demo organizations, which hold demo data. The seed also creates an organization admin and a super admin for local testing; on the live app those have private passwords. The shared student try-out login, `student@hth.demo`, has its own password, shown on its button on the sign-in page.
 
 All demo records are flagged and the app shows a **DEMO DATA** banner.
 
