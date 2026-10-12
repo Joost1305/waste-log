@@ -489,3 +489,23 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .pname { font-weight: 600; }
 .qp { color: var(--primary); }
 td.actions .btn-sm { margin-left: 4px; }
+
+/* System check */
+.sc-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-3); flex: 0 0 12px; margin-top: 4px; }
+.sc-dot.sc-ok { background: #2F7D4F; }
+.sc-dot.sc-warn { background: #D98A1C; }
+.sc-dot.sc-fail { background: #C0392B; }
+.sc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin: 6px 0 10px; }
+.sc-head .sc-dot { margin-top: 0; }
+.sc-list { list-style: none; padding: 0; margin: 0; }
+.sc-list li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sc-list li:last-child { border-bottom: 0; }
+.sc-list li > div { min-width: 0; overflow-wrap: anywhere; }
+.sc-changes { list-style: none; padding: 0; margin: 0; }
+.sc-changes li { padding: 7px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.sc-changes li:last-child { border-bottom: 0; }
+.sc-changes details > summary { cursor: pointer; }
+.sc-changes .sc-changes { margin: 6px 0 0 14px; }
+.sc-fields { margin-top: 2px; }
+.sc-modal-list { max-height: 60vh; overflow-y: auto; }
+tr.sc-current td { background: var(--surface-2); }

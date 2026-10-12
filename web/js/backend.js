@@ -348,6 +348,12 @@ route('POST', '/documents', async ({ form }) => {
   return { path, name: file.name, type: file.type };
 });
 
+// morning system check (platform admin): results, full change list, run now
+route('GET', '/system-checks', async () => check(await sb.from('system_checks')
+  .select('id, run_at, trigger, status, checks, changes, changes_all, gaps, window_from, window_to').order('run_at', { ascending: false }).limit(30)));
+route('GET', '/system-checks/:id/all', async ({ p }) => check(await sb.rpc('system_check_all_changes', { p_check: Number(p.id) })));
+route('POST', '/system-checks/run', async () => invoke('system-check', {}));
+
 // weekly impact e-mail: one list of recipients per restaurant (or one overview for all restaurants)
 route('GET', '/report-subscriptions', async () => check(await sb.from('report_subscriptions')
   .select('id, restaurant_id, recipients, language, is_active, schedule_mode, send_days, send_hour, send_dates, last_sent_week, last_sent_on, last_sent_at, last_status')

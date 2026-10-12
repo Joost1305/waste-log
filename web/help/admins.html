@@ -241,7 +241,8 @@ footer { color: var(--ink-2); font-size: .85rem; border-top: 1px solid var(--lin
   <h2>10. Data, export and audit log</h2>
   <ul>
     <li><strong>Data export</strong> (Settings): one Excel file with every registration, guest counts, summaries, products, suppliers, dishes and targets. Use it for research, reports or your own backup.</li>
-    <li><strong>Audit log</strong> (Settings): who changed what and when. Useful when a number suddenly looks different.</li>
+    <li><strong>Audit log</strong> (Settings): who changed what and when, including the old and the new value. Useful when a number suddenly looks different.</li>
+    <li><strong>System check</strong> (Settings, platform admin only): every morning around 06:25 the app tests the website, the database, signing in, photo storage, the AI, the e-mail service, the weather and the hourly job. It also lists the important changes of the last 24 hours (prices, users, switches, sections, restaurants, targets, weekly e-mail lists) and gaps such as products without a price. Green works, orange is worth a look, red is broken. When something is red, GitHub e-mails the owner of the repository. <span class="ui">Run now</span> checks again straight away.</li>
   </ul>
 </section>
 

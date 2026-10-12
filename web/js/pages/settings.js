@@ -145,6 +145,7 @@ function sections() {
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
     p.audit && { key: 'audit', title: t('set_audit'), custom: renderAudit },
     p.organizations && { key: 'organizations', title: t('set_orgs'), custom: renderOrganizations },
+    state.user.role === 'super_admin' && { key: 'system', title: t('sc_title'), custom: renderSystemCheck },
   ].filter(Boolean);
 }
 
@@ -310,6 +311,99 @@ async function renderLeaderboardSettings(el) {
       };
     });
   }));
+}
+
+// ------------------------------------------------------------------ morning system check (platform admin)
+const SC_DOT = { ok: 'sc-ok', warn: 'sc-warn', fail: 'sc-fail' };
+const scDot = (st) => `<span class="sc-dot ${SC_DOT[st] || ''}" role="img" aria-label="${t('sc_st_' + st)}"></span>`;
+// How a changed value reads: on/off, lists, empty
+function scVal(v) {
+  if (v === null || v === undefined || v === '') return '–';
+  if (v === true) return t('sc_on'); if (v === false) return t('sc_off');
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '–';
+  if (typeof v === 'object') return JSON.stringify(v).slice(0, 60);
+  return String(v);
+}
+// One line per change: who, what, and for updates the fields with old -> new
+function scChange(c) {
+  const ent = t('sc_ent_' + c.entity) !== 'sc_ent_' + c.entity ? t('sc_ent_' + c.entity) : c.entity;
+  const fields = c.changes ? Object.entries(c.changes).map(([k, [a, b]]) => {
+    const lab = t('sc_f_' + k) !== 'sc_f_' + k ? t('sc_f_' + k) : k.replace(/_/g, ' ');
+    // weekdays (1 = Monday) read as day names
+    const v = (x) => (['send_days', 'open_days'].includes(k) && Array.isArray(x) ? x.map((d) => weekdayName(Number(d), 'short')) : x);
+    return `${esc(lab)}: <span class="muted">${esc(scVal(v(a)))}</span> &rarr; <strong>${esc(scVal(v(b)))}</strong>`;
+  }).join('; ') : '';
+  return `<li><span class="small muted nowrap">${fmt.dateTime(c.at)}</span> · <strong>${esc(!c.user || c.user === 'system' ? t('sc_system') : c.user)}</strong>
+    ${t('sc_act_' + c.action)} ${esc(ent.toLowerCase())}${c.name ? ` <em>${esc(c.name)}</em>` : ''}${c.org ? ` <span class="small muted">(${esc(c.org)})</span>` : ''}
+    ${fields ? `<div class="small sc-fields">${fields}</div>` : ''}</li>`;
+}
+// Many of the same change by the same person (an import) become one line that opens
+function scChangeList(list) {
+  const groups = new Map();
+  list.forEach((c) => {
+    const k = `${c.user}|${c.action}|${c.entity}|${c.changes ? Object.keys(c.changes).sort().join(',') : ''}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  });
+  return [...groups.values()].map((g) => {
+    if (g.length < 5) return g.map(scChange).join('');
+    const c = g[0];
+    const ent = t('sc_ent_' + c.entity) !== 'sc_ent_' + c.entity ? t('sc_ent_' + c.entity) : c.entity;
+    return `<li><details><summary><strong>${esc(!c.user || c.user === 'system' ? t('sc_system') : c.user)}</strong> ${t('sc_act_' + c.action)} ${g.length} × ${esc(ent.toLowerCase())}
+      ${c.changes ? `<span class="small muted">(${esc(Object.keys(c.changes).map((k) => (t('sc_f_' + k) !== 'sc_f_' + k ? t('sc_f_' + k) : k)).join(', '))})</span>` : ''}</summary>
+      <ul class="sc-changes">${g.map(scChange).join('')}</ul></details></li>`;
+  }).join('');
+}
+
+async function renderSystemCheck(el, pick) {
+  el.innerHTML = `<div class="card"><span class="spinner"></span></div>`;
+  let rows = [];
+  try { rows = (await api('/system-checks')).data || []; } catch (e) { toastError(e); return; }
+  const cur = rows.find((r) => r.id === pick) || rows[0];
+  const head = `<div class="page-head" style="margin-bottom:6px"><h2 style="margin:0">${t('sc_title')}</h2>
+      <div class="page-actions"><button class="btn-primary btn-sm" id="sc-run">${t('sc_run')}</button></div></div>
+    <p class="small muted" style="margin-top:0">${t('sc_sub')}</p>`;
+  if (!cur) { el.innerHTML = `<div class="card">${head}<div class="empty">${t('sc_none')}</div></div>`; bindRun(); return; }
+  const counts = { fail: cur.checks.filter((c) => c.status === 'fail').length, warn: cur.checks.filter((c) => c.status === 'warn').length };
+  el.innerHTML = `<div class="card">${head}
+      <div class="sc-head ${SC_DOT[cur.status]}">${scDot(cur.status)} <strong>${t('sc_overall_' + cur.status)}</strong>
+        <span class="small muted">· ${fmt.dateTime(cur.run_at)} · ${t(cur.trigger === 'manual' ? 'sc_manual' : 'sc_scheduled')}</span></div>
+      <ul class="sc-list">${cur.checks.map((c) => `<li>${scDot(c.status)}<div><strong>${t('sc_k_' + c.key)}</strong>
+        <div class="small muted">${esc(c.detail)}${c.ms ? ` · ${fmt.num(c.ms)} ms` : ''}</div></div></li>`).join('')}</ul>
+    </div>
+    ${cur.gaps.length ? `<div class="card"><h2>${t('sc_gaps')}</h2><ul class="sc-list">${cur.gaps.map((g) => `<li>${scDot('warn')}<div>
+      <strong>${t('sc_g_' + g.key)}</strong>${g.count ? ` (${g.count})` : ''} <span class="small muted">· ${esc(g.org || '')}</span>
+      <div class="small muted">${esc((g.items || []).join(', '))}${g.count > (g.items || []).length ? ' …' : ''}</div></div></li>`).join('')}</ul></div>` : ''}
+    <div class="card"><div class="page-head" style="margin-bottom:6px"><h2 style="margin:0">${t('sc_changes')}</h2>
+      <div class="page-actions"><button class="btn-sm" id="sc-all">${t('sc_all', { n: fmt.num(cur.changes_all) })}</button></div></div>
+      <p class="small muted" style="margin-top:0">${t('sc_changes_sub', { from: fmt.dateTime(cur.window_from), to: fmt.dateTime(cur.window_to) })}</p>
+      ${cur.changes.length ? `<ul class="sc-changes">${scChangeList(cur.changes)}</ul>` : `<div class="empty">${t('sc_no_changes')}</div>`}</div>
+    <div class="card"><h2>${t('sc_history')}</h2><div class="table-wrap"><table><tbody>
+      ${rows.map((r) => {
+        const f = r.checks.filter((c) => c.status === 'fail').length; const w = r.checks.filter((c) => c.status === 'warn').length;
+        return `<tr class="${r.id === cur.id ? 'sc-current' : ''}"><td class="nowrap">${scDot(r.status)} ${fmt.dateTime(r.run_at)}</td>
+          <td class="small">${f ? `<strong>${t('sc_n_fail', { n: f })}</strong> ` : ''}${w ? t('sc_n_warn', { n: w }) : ''}${!f && !w ? t('sc_all_ok') : ''}
+            · ${t('sc_n_changes', { n: r.changes.length })}</td>
+          <td class="actions">${r.id === cur.id ? '' : `<button class="btn-sm btn-ghost" data-sc="${r.id}">${t('sc_open')}</button>`}</td></tr>`;
+      }).join('')}</tbody></table></div></div>`;
+  bindRun();
+  $$('[data-sc]', el).forEach((b) => (b.onclick = () => renderSystemCheck(el, Number(b.dataset.sc))));
+  $('#sc-all', el).onclick = async () => {
+    openModal(`<div class="card empty"><span class="spinner"></span></div>`);
+    let all = [];
+    try { all = (await api(`/system-checks/${cur.id}/all`)).data || []; } catch (e) { toastError(e); document.getElementById('modal').hidden = true; return; }
+    openModal(`<h2>${t('sc_all_title')}</h2><p class="small muted">${t('sc_changes_sub', { from: fmt.dateTime(cur.window_from), to: fmt.dateTime(cur.window_to) })}</p>
+      ${all.length ? `<ul class="sc-changes sc-modal-list">${scChangeList(all.map((c) => (c.entity === 'waste_records' && c.kg != null ? { ...c, name: fmt.kg(Number(c.kg), 2) } : c)))}</ul>` : `<div class="empty">${t('sc_no_changes')}</div>`}
+      ${all.length >= 1000 ? `<p class="small muted">${t('sc_first_1000')}</p>` : ''}
+      <div class="modal-actions"><button data-close>${t('close')}</button></div>`);
+  };
+  function bindRun() {
+    $('#sc-run', el).onclick = async (e) => {
+      e.target.disabled = true; e.target.innerHTML = `<span class="spinner"></span> ${t('sc_running')}`;
+      try { await api('/system-checks/run', { method: 'POST' }); toast(t('sc_done')); } catch (err) { toastError(err); }
+      renderSystemCheck(el);
+    };
+  }
 }
 
 // ------------------------------------------------------------------ weekly impact e-mail
