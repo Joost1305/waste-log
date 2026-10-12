@@ -22,13 +22,13 @@ function sections() {
       headerActions: [{ label: `&#128269; ${t('mp_btn')}`, run: (reload) => openMissingProducts(reload) },
         { label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
       columns: [
-        [t('name'), (r) => `${esc(r.name)} ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}`],
-        [t('name_en_col'), (r) => `<span class="muted">${esc(r.name_en || '')}</span>`],
+        // Dutch and English name in one cell (English underneath), a star for quick buttons: keeps the table narrow
+        [t('name'), (r) => `<div class="pname">${esc(r.name)}${r.is_quick_pick ? ` <span class="qp" title="${t('quick_pick')}" aria-label="${t('quick_pick')}">&#9733;</span>` : ''}
+          ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}</div>${r.name_en ? `<div class="small muted">${esc(r.name_en)}</div>` : ''}`],
         [t('category'), (r) => esc(labelOf(meta.waste_categories, r.waste_category_id))],
         [t('reg_supplier'), (r) => esc(r.supplier_name || '')],
-        [t('price_kg'), (r) => `${r.price_estimated ? `<span class="muted" title="${t('price_est_hint')}">≈ </span>` : ''}${fmt.money(r.purchase_price_per_kg, 2)}`, true],
+        [t('price_kg_short'), (r) => `${r.price_estimated ? `<span class="muted" title="${t('price_est_hint')}">≈ </span>` : ''}${fmt.money(r.purchase_price_per_kg, 2)}`, true],
         [t('co2_col'), (r) => (r.co2e_per_kg != null ? `<span title="${esc(r.co2e_source || '')}">${fmt.num(r.co2e_per_kg, 2)}</span>` : `<span class="muted" title="${t('co2_cat_hint')}">${t('co2_cat_short')}</span>`), true],
-        [t('quick_pick'), (r) => yes(r.is_quick_pick)],
       ],
       fields: () => [
         { name: 'name', label: t('name_nl_field'), required: true },
