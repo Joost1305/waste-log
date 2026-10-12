@@ -2,7 +2,7 @@ import { api, app, esc, toast, toastError, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { SHOW_DEMO_LOGINS } from '../config.js';
 
-// Two demo logins on the sign-in page; one tap fills in the account and signs in (password demo1234)
+// Two shared logins (HTH Amsterdam) on the sign-in page; one tap fills in the account and signs in (password demo1234)
 const DEMO = [{ email: 'orgadmin@hth.demo', label: 'demo_admin' }, { email: 'student@hth.demo', label: 'demo_student' }];
 
 export function renderLogin(onSuccess) {
