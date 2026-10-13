@@ -20,6 +20,8 @@ const FIELDS = ['name_en', 'name', 'category', 'price', 'sales', 'supplier'];
 
 // Words that hint at a category, checked in the category column first and then in the product name
 const HINTS = {
+  // soup first, so "groentesoep" is soup, not vegetables
+  soup: ['soep', 'soup', 'bisque', 'potage', 'veloute', 'consomme', 'minestrone', 'gazpacho', 'ramen'],
   meat: ['vlees', 'meat', 'kip', 'chicken', 'rund', 'beef', 'varken', 'pork', 'lam', 'lamb', 'gehakt', 'ham', 'spek', 'bacon', 'worst', 'sausage', 'eend', 'duck', 'kalkoen', 'turkey', 'wild', 'gevogelte', 'poultry', 'kalf', 'veal'],
   fish: ['vis', 'fish', 'zalm', 'salmon', 'kabeljauw', 'cod', 'garnaal', 'shrimp', 'prawn', 'mossel', 'mussel', 'tonijn', 'tuna', 'schaal', 'seafood', 'oester', 'oyster', 'makreel', 'haring'],
   dairy: ['zuivel', 'dairy', 'kaas', 'cheese', 'melk', 'milk', 'room', 'cream', 'boter', 'butter', 'yoghurt', 'yogurt', 'ei', 'eieren', 'egg', 'kwark'],
@@ -27,7 +29,7 @@ const HINTS = {
   starch: ['aardappel', 'potato', 'rijst', 'rice', 'pasta', 'noodle', 'couscous', 'bulgur', 'quinoa', 'friet', 'fries', 'zetmeel', 'starch', 'graan'],
   fruit: ['fruit', 'appel', 'apple', 'peer', 'pear', 'banaan', 'banana', 'citroen', 'lemon', 'limoen', 'lime', 'sinaasappel', 'orange', 'aardbei', 'strawberr', 'bes', 'berr', 'druif', 'grape', 'meloen', 'melon', 'mango', 'ananas'],
   vegetables: ['groente', 'vegetable', 'veg', 'sla', 'lettuce', 'tomaat', 'tomato', 'ui', 'onion', 'wortel', 'carrot', 'kool', 'cabbage', 'paprika', 'pepper', 'courgette', 'spinazie', 'spinach', 'prei', 'leek', 'champignon', 'mushroom', 'komkommer', 'cucumber', 'broccoli', 'bloemkool', 'knoflook', 'garlic', 'kruiden', 'herb', 'biet', 'beet'],
-  prepared: ['bereid', 'prepared', 'soep', 'soup', 'saus', 'sauce', 'gerecht', 'dish', 'salade', 'salad', 'buffet'],
+  prepared: ['bereid', 'prepared', 'saus', 'sauce', 'gerecht', 'dish', 'salade', 'salad', 'buffet'],
 };
 
 function guessColumns(header) {
