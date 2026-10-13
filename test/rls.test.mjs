@@ -648,3 +648,61 @@ test('system check: change log keeps old and new values, important changes, gaps
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_inputs(now(), now())`)));
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_all_changes(1)`)), /Not allowed/);
 });
+
+test('sales: import a day, groups, guests from menus, dish links, waste % of food sales', async () => {
+  const day = (await db.query(`select (app.local_date(now()) - 2)::text d`)).rows[0].d;
+  const lines = [
+    { group_name: 'Menu', item_name: 'Experience menu 3 course', qty: 10, incl: 300, excl: 275.23 },
+    { group_name: 'Main course', item_name: 'Exp Main course Meat *', qty: 6, incl: 0, excl: 0 },
+    { group_name: 'Main course', item_name: 'Exp Main course Vega *', qty: 4, incl: 0, excl: 0 },
+    { group_name: 'Wine', item_name: 'GL Albet I Noya Brut', qty: 5, incl: 17.5, excl: 14.46 },
+  ];
+  const imp = (p) => as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select import_sales($1::jsonb) r`, [JSON.stringify(p)])).r);
+  const r1 = await imp({ restaurant_id: ID.ams, period_from: day, period_to: day, file_name: 'day.xlsx', lines });
+  assert.equal(r1.lines, 4); assert.equal(r1.replaced, false);
+  // Other restaurants' managers cannot import here; students not at all
+  await assert.rejects(as(db, U['manager.denhaag@hth'], ({ q }) => q(`select import_sales($1::jsonb)`,
+    [JSON.stringify({ restaurant_id: ID.ams, period_from: day, lines })])), /Not allowed/);
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`select import_sales($1::jsonb)`,
+    [JSON.stringify({ restaurant_id: ID.ams, period_from: day, lines })])), /Not allowed/);
+  // Groups are guessed: wine is a drink, the rest food
+  const groups = (await db.query(`select group_name, kind, id from sales_groups where restaurant_id = $1 order by group_name`, [ID.ams])).rows;
+  assert.equal(groups.find((g) => g.group_name === 'Wine').kind, 'drink');
+  assert.equal(groups.find((g) => g.group_name === 'Menu').kind, 'food');
+  // Ticking "Menu" as guests fills guests per day from sales, but never over a hand-entered count
+  await db.query(`delete from daily_covers where restaurant_id = $1 and date = $2`, [ID.ams, day]);
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`select set_sales_group($1, 'food', true)`, [groups.find((g) => g.group_name === 'Menu').id]));
+  let cov = (await db.query(`select guests, source from daily_covers where restaurant_id = $1 and date = $2`, [ID.ams, day])).rows[0];
+  assert.equal(cov.guests, 10); assert.equal(cov.source, 'sales');
+  await db.query(`update daily_covers set guests = 12, source = 'manual' where restaurant_id = $1 and date = $2`, [ID.ams, day]);
+  await imp({ restaurant_id: ID.ams, period_from: day, period_to: day, file_name: 'again.xlsx', lines });
+  cov = (await db.query(`select guests, source from daily_covers where restaurant_id = $1 and date = $2`, [ID.ams, day])).rows[0];
+  assert.equal(cov.guests, 12, 'hand-entered guests stay');
+  assert.equal((await db.query(`select count(*)::int n from sales_reports where restaurant_id = $1 and period_from = $2 and deleted_at is null`, [ID.ams, day])).rows[0].n, 1, 'same day replaces');
+  // Link the meat main to a dish with a portion, register waste on that dish
+  const dish = (await db.query(`insert into menu_items (organization_id, restaurant_id, name, portion_size_g) values ($1, $2, 'Test meat main', 200) returning id`, [ID.hth, ID.ams])).rows[0].id;
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`select link_sales_item('Exp Main course Meat *', $1, false)`, [dish]));
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`select link_sales_item('Experience menu 3 course', null, true)`));
+  const items = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select sales_items() s`)).s);
+  assert.ok(items.some((i) => i.item_name === 'Exp Main course Meat *' && Number(i.menu_item_id) === Number(dish)));
+  assert.ok(!items.some((i) => i.item_name === 'GL Albet I Noya Brut'), 'drinks are not offered as dishes');
+  await db.query(`update waste_records set deleted_at = now() where restaurant_id = $1 and app.local_date(recorded_at) = $2`, [ID.ams, day]);
+  const meat = (await db.query(`select id from products where organization_id = $1 and deleted_at is null limit 1`, [ID.hth])).rows[0].id;
+  await db.query(`insert into waste_records (organization_id, restaurant_id, user_id, product_id, waste_category_id, reason_id, weight_kg, recorded_at, menu_item_id)
+    select $1, $2, $3, $4, p.waste_category_id, (select id from waste_reasons limit 1), 0.3, ($5::date + time '20:00') at time zone 'Europe/Amsterdam', $6
+      from products p where p.id = $4`, [ID.hth, ID.ams, U['student@hth'], meat, day, dish]);
+  const s = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select sales_summary(null, $1, $2::date, $2::date) s`, [ID.ams, day])).s);
+  assert.equal(s.has_sales, true);
+  assert.equal(Number(s.food_sales_excl), 275.23);
+  assert.equal(Number(s.dishes_sold), 6);
+  const d = s.dishes.find((x) => Number(x.menu_item_id) === Number(dish));
+  assert.equal(Number(d.sold), 6); assert.equal(Number(d.waste_kg), 0.3);
+  assert.equal(Number(d.waste_pct), 25, '0.3 kg of 6 x 200 g');
+  assert.equal(Number(s.waste_pct_of_food_sales), Math.round(Number(s.waste_value) / 275.23 * 10000) / 100);
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`select sales_summary()`)), /Not allowed/);
+  // Deleting the report removes guests that came from it (hand-entered ones stay)
+  const rid = (await db.query(`select id from sales_reports where restaurant_id = $1 and period_from = $2 and deleted_at is null`, [ID.ams, day])).rows[0].id;
+  await db.query(`update daily_covers set source = 'sales' where restaurant_id = $1 and date = $2`, [ID.ams, day]);
+  await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`select delete_sales_report($1)`, [rid]));
+  assert.equal((await db.query(`select count(*)::int n from daily_covers where restaurant_id = $1 and date = $2`, [ID.ams, day])).rows[0].n, 0);
+});

@@ -6,6 +6,7 @@ import { exportAll } from '../export.js';
 import { openProductImport } from '../product-import.js';
 import { openMissingProducts } from '../missing-products.js';
 import { renderInvoices } from '../invoices.js';
+import { renderSales, openTillLinks } from '../sales.js';
 import { renderOrganizations } from '../org-wizard.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
@@ -53,6 +54,7 @@ function sections() {
     p.catalog && { key: 'invoices', title: t('inv_title'), custom: renderInvoices },
     p.catalog && {
       key: 'menu', title: t('set_menu'), endpoint: '/menu-items', canEdit: true, reloadMeta: true,
+      headerActions: [{ label: `&#128279; ${t('tl_btn')}`, run: (reload) => openTillLinks(reload) }],
       columns: [
         [t('name'), (r) => esc(r.name)], [t('restaurant'), (r) => esc(r.restaurant_name || t('all_restaurants'))],
         [t('portion_g'), (r) => fmt.num(r.portion_size_g), true], [t('sales_price'), (r) => fmt.money(r.sales_price, 2), true],
@@ -139,6 +141,7 @@ function sections() {
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
     },
+    p.dashboard && { key: 'sales', title: t('sl_title'), custom: renderSales },
     p.dashboard && { key: 'weekly', title: t('set_weekly'), custom: renderWeekly },
     p.dashboard && { key: 'leaderboard', title: t('set_leaderboard'), custom: renderLeaderboardSettings },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
