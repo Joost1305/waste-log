@@ -715,3 +715,8 @@ test('gallery: filter on estimated versus measured weights', async () => {
   assert.ok(est.rows.every((r) => r.weight_source === 'estimate'));
   assert.ok(meas.rows.every((r) => r.weight_source !== 'estimate'));
 });
+
+test('sales switch: off by default, shown in app_meta', async () => {
+  const m = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select app_meta(null, 'en') m`)).m);
+  assert.equal(m.organization.sales_enabled, false);
+});

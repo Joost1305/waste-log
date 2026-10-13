@@ -58,7 +58,8 @@ async function load() {
 // Sales from the till: waste as % of food sales, per 100 dishes sold, and per dish sold versus wasted
 async function loadSales() {
   const box = $('#dash-sales');
-  if (!box) return;
+  // Only when the organization uses sales reports (Settings › Organization)
+  if (!box || !(state.meta.organization && state.meta.organization.sales_enabled)) return;
   let s;
   try { s = (await api('/sales-summary', { query: { restaurant_id: q.restaurant_id, from: q.from, to: q.to } })).data; } catch { return; }
   if (!s || !s.has_sales) {

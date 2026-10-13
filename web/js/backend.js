@@ -113,7 +113,7 @@ route('POST', '/organizations/:id/admin', async ({ p, body }) => invoke('admin-u
   language: body.language || 'en', invite: true, is_active: true, restaurant_ids: [], redirect_to: `${location.origin}${location.pathname}` }));
 route('GET', '/organization', async () => check(await sb.from('organizations').select('*').eq('id', ctx.orgId).single()));
 route('PATCH', '/organization', async ({ body }) =>
-  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start'])).eq('id', ctx.orgId).select().single()));
+  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start', 'sales_enabled'])).eq('id', ctx.orgId).select().single()));
 
 // restaurants
 route('GET', '/restaurants', async () => check(await sb.from('restaurants').select('*').eq('organization_id', ctx.orgId).is('deleted_at', null).order('name')));

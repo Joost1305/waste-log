@@ -7,6 +7,9 @@ import { openProductImport } from '../product-import.js';
 import { openMissingProducts } from '../missing-products.js';
 import { renderInvoices } from '../invoices.js';
 import { renderSales, openTillLinks } from '../sales.js';
+
+// Sales (till reports) is an option per organization, switched on in Settings › Organization
+const salesOn = () => !!(state.meta.organization && state.meta.organization.sales_enabled);
 import { renderOrganizations } from '../org-wizard.js';
 
 const yes = (b) => (b ? '&#10003;' : '');
@@ -54,7 +57,7 @@ function sections() {
     p.catalog && { key: 'invoices', title: t('inv_title'), custom: renderInvoices },
     p.catalog && {
       key: 'menu', title: t('set_menu'), endpoint: '/menu-items', canEdit: true, reloadMeta: true,
-      headerActions: [{ label: `&#128279; ${t('tl_btn')}`, run: (reload) => openTillLinks(reload) }],
+      headerActions: salesOn() ? [{ label: `&#128279; ${t('tl_btn')}`, run: (reload) => openTillLinks(reload) }] : [],
       columns: [
         [t('name'), (r) => esc(r.name)], [t('restaurant'), (r) => esc(r.restaurant_name || t('all_restaurants'))],
         [t('portion_g'), (r) => fmt.num(r.portion_size_g), true], [t('sales_price'), (r) => fmt.money(r.sales_price, 2), true],
@@ -141,7 +144,7 @@ function sections() {
         { name: 'is_active', label: t('active'), type: 'checkbox', default: true },
       ],
     },
-    p.dashboard && { key: 'sales', title: t('sl_title'), custom: renderSales },
+    p.dashboard && salesOn() && { key: 'sales', title: t('sl_title'), custom: renderSales },
     p.dashboard && { key: 'weekly', title: t('set_weekly'), custom: renderWeekly },
     p.dashboard && { key: 'leaderboard', title: t('set_leaderboard'), custom: renderLeaderboardSettings },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
@@ -240,12 +243,19 @@ async function renderOrg(el) {
     { name: 'default_language', label: t('language'), type: 'select', blank: false, numericValue: false, options: Object.entries(LANGS).map(([v, l]) => ({ value: v, label: l })) },
     { name: 'currency', label: t('currency'), required: true },
     { name: 'weather_enabled', label: t('weather_enabled'), type: 'checkbox' },
+    { name: 'sales_enabled', label: t('sales_enabled'), type: 'checkbox' },
   ];
   el.innerHTML = `<form class="card" id="org-form"><h2>${t('set_org')}</h2>${formHtml(fields, org)}
+    <p class="small muted" style="margin-top:-6px">${t('sales_enabled_hint')}</p>
     <button class="btn-primary" type="submit">${t('save')}</button></form>`;
   $('#org-form').onsubmit = async (e) => {
     e.preventDefault();
-    try { await api('/organization', { method: 'PATCH', body: readForm(el, fields) }); await loadMeta(); toast(t('org_saved')); } catch (err) { toastError(err); }
+    try {
+      const body = readForm(el, fields);
+      await api('/organization', { method: 'PATCH', body }); await loadMeta(); toast(t('org_saved'));
+      // The Sales page appears or disappears in the menu
+      if (!!body.sales_enabled !== !!org.sales_enabled) renderSettings(['organization']);
+    } catch (err) { toastError(err); }
   };
 }
 
