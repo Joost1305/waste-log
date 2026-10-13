@@ -648,3 +648,12 @@ test('system check: change log keeps old and new values, important changes, gaps
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_inputs(now(), now())`)));
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`select system_check_all_changes(1)`)), /Not allowed/);
 });
+
+test('gallery: filter on estimated versus measured weights', async () => {
+  const g = async (w) => (await as(db, U['manager.amsterdam@hth'], async ({ one }) =>
+    (await one(`select gallery(p_limit => 100, p_weight => $1::text) g`, [w])).g));
+  const all = await g(null); const est = await g('estimate'); const meas = await g('measured');
+  assert.equal(Number(all.total), Number(est.total) + Number(meas.total));
+  assert.ok(est.rows.every((r) => r.weight_source === 'estimate'));
+  assert.ok(meas.rows.every((r) => r.weight_source !== 'estimate'));
+});
