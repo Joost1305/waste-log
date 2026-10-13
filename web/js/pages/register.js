@@ -132,6 +132,7 @@ function renderPhoto() {
     const applied = s.productId === sg.product_id && s.categoryId === sg.waste_category_id && (sg.product_id || s.productName === sg.product_name);
     ai = `<div class="ai-card"><div class="small muted">${t('reg_ai_suggest')}</div>
       <strong>${esc((state.meta.products.find((x) => x.id === sg.product_id) || {}).name || sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
+      ${sg.menu_item_name ? `<div class="small" style="margin-top:4px">${t('reg_menu_item')}: <strong>${esc(sg.menu_item_name)}</strong></div>` : ''}
       ${sg.reason_id ? `<div class="small" style="margin-top:4px">${sg.is_plated_meal ? '&#127869; ' : ''}${t('reason')}: <strong>${esc((state.meta.waste_reasons.find((r) => r.id === sg.reason_id) || {}).label || '')}</strong></div>` : ''}
       ${applied ? '' : `<div style="margin-top:6px"><button type="button" class="btn-sm btn-primary" id="ai-use">${t('reg_ai_use')}</button></div>`}
       <div class="ai-note">${t('reg_ai_note')}</div></div>`;
@@ -150,6 +151,8 @@ function applySuggestion(sg) {
   s.categoryId = sg.waste_category_id || null;
   // The AI's reason (e.g. plate waste when it sees a served plate), unless the user already picked one
   if (sg.reason_id && !s.reasonId && state.meta.waste_reasons.some((r) => r.id === sg.reason_id)) s.reasonId = sg.reason_id;
+  // The dish the AI recognised (from this restaurant's dishes), unless one was chosen already
+  if (sg.menu_item_id && !s.menuItemId && state.meta.menu_items.some((m) => m.id === sg.menu_item_id)) s.menuItemId = sg.menu_item_id;
   applyWeight(sg);
   const prod = state.meta.products.find((x) => x.id === s.productId);
   if (prod && prod.default_supplier_id) s.supplierId = prod.default_supplier_id;
@@ -191,7 +194,7 @@ async function handlePhoto(file) {
     photo.token = up.photo_path;
     photo.uploading = false;
     renderPhoto(); updateSave();
-    const ai = (await api('/waste/photo/identify', { method: 'POST', body: { photo_path: photo.token } })).data;
+    const ai = (await api('/waste/photo/identify', { method: 'POST', body: { photo_path: photo.token, restaurant_id: s.restaurantId } })).data;
     if (s.photo !== photo) return;
     if (ai && ai.available === false) { photo.ai = 'off'; renderPhoto(); updateSave(); return; }
     if (ai && ai.ok && ai.suggestion) {

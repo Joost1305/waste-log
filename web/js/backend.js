@@ -282,7 +282,7 @@ route('POST', '/waste/photo', async ({ form }) => {
   if (error) throw new ApiError(403, /row-level security/i.test(error.message) ? 'No permission to save a photo for this organization' : error.message);
   return { photo_path: path };
 });
-route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food', { photo_path: body.photo_path, lang: ctx.lang }));
+route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food', { photo_path: body.photo_path, lang: ctx.lang, restaurant_id: num(body.restaurant_id) }));
 
 // automatic quick buttons: the restaurant's most registered products (last 30 days)
 route('GET', '/top-products', async ({ query }) =>
@@ -347,6 +347,21 @@ route('POST', '/documents', async ({ form }) => {
     : /mime|type/i.test(error.message) ? 'Only photos (JPG, PNG, WebP) and PDF files' : /size|large/i.test(error.message) ? 'File is larger than 10 MB' : error.message);
   return { path, name: file.name, type: file.type };
 });
+
+// sales reports from the till (Settings › Sales), their groups, links from till items to dishes, dashboard figures
+route('GET', '/sales-reports', async () => check(await sb.from('sales_reports')
+  .select('id, restaurant_id, period_from, period_to, file_name, total_incl, total_excl, line_count, created_at, restaurants(name)')
+  .eq('organization_id', ctx.orgId).is('deleted_at', null).order('period_from', { ascending: false }).limit(500)).map(flat));
+route('POST', '/sales-reports', async ({ body }) => check(await sb.rpc('import_sales', { p: body })));
+route('DELETE', '/sales-reports/:id', async ({ p }) => check(await sb.rpc('delete_sales_report', { p_id: Number(p.id) })));
+route('GET', '/sales-groups', async () => check(await sb.from('sales_groups').select('id, restaurant_id, group_name, kind, counts_guests, restaurants(name)')
+  .eq('organization_id', ctx.orgId).order('group_name')).map(flat));
+route('PATCH', '/sales-groups/:id', async ({ p, body }) => check(await sb.rpc('set_sales_group', { p_id: Number(p.id), p_kind: body.kind, p_counts_guests: !!body.counts_guests })));
+route('GET', '/sales-items', async () => check(await sb.rpc('sales_items', { p_org: ctx.orgId })));
+route('POST', '/sales-items/link', async ({ body }) => check(await sb.rpc('link_sales_item',
+  { p_item_name: body.item_name, p_menu_item: body.menu_item_id ? Number(body.menu_item_id) : null, p_ignored: !!body.ignored })));
+route('GET', '/sales-summary', async ({ query }) => check(await sb.rpc('sales_summary',
+  { p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null })));
 
 // morning system check (platform admin): results, full change list, run now
 route('GET', '/system-checks', async () => check(await sb.from('system_checks')

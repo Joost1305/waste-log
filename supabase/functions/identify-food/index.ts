@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
   const { KEY, MODEL } = env();
   if (!KEY) return json({ ok: true, data: { ok: false, available: false } });
 
-  let body: { photo_path?: string; lang?: string };
+  let body: { photo_path?: string; lang?: string; restaurant_id?: number };
   try { body = await req.json(); } catch { return fail(400, 'Invalid JSON'); }
   const path = String(body.photo_path || '');
   // The organization comes from the user; a super admin (no organization of their own) works in the photo's organization
@@ -102,6 +102,14 @@ Deno.serve(async (req) => {
     sb.from('waste_reasons').select('id, code').or(`organization_id.is.null,organization_id.eq.${orgId}`).eq('is_active', true),
   ]);
   const reasons = rsns || [];
+  // The restaurant's dishes (menu items): the AI names the dish when it recognises one, e.g. on a served plate
+  let dishes: { id: number; name: string }[] = [];
+  const rid = Number(body.restaurant_id) || null;
+  if (rid) {
+    const { data: ds } = await sb.from('menu_items').select('id, name').eq('organization_id', orgId).eq('is_active', true)
+      .is('deleted_at', null).or(`restaurant_id.is.null,restaurant_id.eq.${rid}`).order('name').limit(150);
+    dishes = (ds || []).filter((d) => d.name && d.name.trim());
+  }
   // All active products (paged: Supabase returns at most 1000 rows per request), used to match the AI's answer
   const products: Product[] = [];
   for (let from = 0; from < 20000; from += 1000) {
@@ -124,6 +132,8 @@ Deno.serve(async (req) => {
     'Write product the way a Dutch professional kitchen lists it (in Dutch, e.g. "Tomaten", "Kipdijfilet", "Stokbrood"); product_en is the same in plain English. Keep both short: at most 6 words.',
     'Served plate: if the food sits on a served plate or in a serving dish (a plated meal or leftovers from a guest), set is_plated_meal to true.',
     'For a plated meal with several components, use category_code "prepared", name the dish briefly (e.g. "Visgerecht met puree en groente" / "Fish dish with mash and vegetables") and list the main components in components_en.',
+    ...(categories.some((c) => c.code === 'soup') ? ['Soup (in a bowl, pot, pan or soup kettle) is category_code "soup", also when it is served.'] : []),
+    dishes.length ? `dish: if the food is (part of) one of the restaurant's dishes, give its exact name from this list, otherwise null: ${dishes.map((d) => d.name).join('; ')}.` : 'dish: null.',
     `reason_code: the most likely reason, from exactly this list: ${reasons.map((r) => r.code).join(', ')}. A served plate with leftovers is "plate". Use null if you cannot tell.`,
     'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
     'Otherwise estimate the weight of the wasted food in kg (not the plate or container) from its size and any reference objects, and set weight_source to "estimate".',
@@ -147,6 +157,7 @@ Deno.serve(async (req) => {
         is_plated_meal: { type: 'boolean' },
         components_en: { type: 'array', items: { type: 'string' } },
         reason_code: { type: ['string', 'null'], enum: [...reasons.map((r) => r.code), null] },
+        dish: { type: ['string', 'null'] },
         confidence: { type: 'number' },
         suggested_weight_kg: { type: ['number', 'null'] },
         weight_source: { type: ['string', 'null'], enum: ['scale', 'estimate', null] },
@@ -203,6 +214,8 @@ Deno.serve(async (req) => {
       ? comps.flatMap((c) => rankProducts([c], products, uses).slice(0, 1)).filter((r, i, a) => a.findIndex((x) => x.p.id === r.p.id) === i)
       : rankProducts([s.product, s.product_en || ''], products, uses);
     const product = plated ? null : (ranked.length ? ranked[0].p : null);
+    const normName = (x: unknown) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    const dish = typeof s.dish === 'string' ? dishes.find((d) => normName(d.name) === normName(s.dish)) || null : null;
     return json({ ok: true, data: { ok: true, available: true, suggestion: {
       product_text: s.product,
       product_id: product ? product.id : null,
@@ -212,6 +225,8 @@ Deno.serve(async (req) => {
       is_plated_meal: plated,
       components: comps,
       reason_id: reason?.id ?? null,
+      menu_item_id: dish ? dish.id : null,
+      menu_item_name: dish ? dish.name : null,
       reason_code: reason?.code ?? null,
       category_code: cat?.code ?? null,
       subcategory: typeof s.subcategory === 'string' ? s.subcategory.slice(0, 80) : null,
