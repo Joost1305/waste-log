@@ -706,3 +706,12 @@ test('sales: import a day, groups, guests from menus, dish links, waste % of foo
   await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`select delete_sales_report($1)`, [rid]));
   assert.equal((await db.query(`select count(*)::int n from daily_covers where restaurant_id = $1 and date = $2`, [ID.ams, day])).rows[0].n, 0);
 });
+
+test('gallery: filter on estimated versus measured weights', async () => {
+  const g = async (w) => (await as(db, U['manager.amsterdam@hth'], async ({ one }) =>
+    (await one(`select gallery(p_limit => 100, p_weight => $1::text) g`, [w])).g));
+  const all = await g(null); const est = await g('estimate'); const meas = await g('measured');
+  assert.equal(Number(all.total), Number(est.total) + Number(meas.total));
+  assert.ok(est.rows.every((r) => r.weight_source === 'estimate'));
+  assert.ok(meas.rows.every((r) => r.weight_source !== 'estimate'));
+});

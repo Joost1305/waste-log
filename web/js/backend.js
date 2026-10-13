@@ -293,7 +293,7 @@ route('GET', '/gallery', async ({ query }) => {
   const res = check(await sb.rpc('gallery', {
     p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
     p_category: num(query.waste_category_id), p_limit: num(query.limit) || 24, p_offset: num(query.offset) || 0, p_lang: ctx.lang,
-    p_sort: query.sort || 'heaviest',
+    p_sort: query.sort || 'heaviest', p_weight: ['estimate', 'measured'].includes(query.weight) ? query.weight : null,
   }));
   return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
 });
