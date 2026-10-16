@@ -54,7 +54,8 @@ function equivalentsHtml(kg) {
     <div class="table-wrap"><table><thead><tr><th>${t('eq_compare')}</th><th class="right">${t('eq_factor')}</th></tr></thead><tbody>
       ${EQUIVALENTS.map((e) => `<tr><td>${esc(unitText(e))}</td><td class="right num">${fmt.num(e.per_unit, 2)}</td></tr>`).join('')}
     </tbody></table></div>
-    <details style="margin-top:8px"><summary class="small">${t('eq_sources')}</summary>
+    <p class="small muted" style="margin:8px 0 0">${t('eq_sources_short')}</p>
+    <details style="margin-top:6px"><summary class="small">${t('eq_sources')}</summary>
       ${EQUIVALENTS.map((e) => `<p class="small">${esc(e.source)}<br><a href="${esc(e.source_url)}" target="_blank" rel="noopener">${t('co2_open_source')} &#8599;</a></p>`).join('')}
     </details>`;
 }

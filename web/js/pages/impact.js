@@ -49,7 +49,7 @@ export async function renderImpact(rest) {
         <div class="delta muted">${t('imp_pub_per_guest_note')}</div></div>
       <button type="button" class="card kpi kpi-link" id="imp-co2"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${L.co2e_kg >= 1000 ? `${fmt.num(L.co2e_kg / 1000, 1)} t` : fmt.kg(L.co2e_kg, 0)}</div>
-        ${co2Eq ? `<div class="eq">${co2Eq}</div>` : ''}
+        ${co2Eq ? `<div class="eq">${co2Eq} <span class="eq-tag">${t('eq_indication')}</span></div>` : ''}
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
       <div class="card kpi"><div class="label">${t('imp_pub_records')}</div><div class="value">${fmt.num(L.records)}</div>
         <div class="delta muted">${t('imp_pub_records_note')}</div></div>

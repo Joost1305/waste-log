@@ -101,7 +101,7 @@ function draw(d) {
         <div class="delta muted">${fmt.num(T.guests)} ${t('guests').toLowerCase()}</div></div>
       <button type="button" class="card kpi kpi-link" id="kpi-co2" title="${t('co2_hint')}"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${T.co2e_kg >= 1000 ? `${fmt.num(T.co2e_kg / 1000, 1)} t` : fmt.kg(T.co2e_kg, 0)}</div>
-        ${co2Eq ? `<div class="eq">${co2Eq}</div>` : ''}
+        ${co2Eq ? `<div class="eq">${co2Eq} <span class="eq-tag">${t('eq_indication')}</span></div>` : ''}
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
     </div>
     <div style="margin-top:16px">${targetHtml}</div>

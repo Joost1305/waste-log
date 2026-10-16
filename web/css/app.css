@@ -157,6 +157,7 @@ details.more[open] summary { margin-bottom: 12px; }
 .kpi .value { font-size: 1.75rem; font-weight: 750; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .kpi .delta { font-size: .82rem; margin-top: 2px; }
 .kpi .eq { font-size: .82rem; margin-top: 4px; color: var(--ink); font-weight: 600; line-height: 1.35; }
+.kpi .eq-tag { font-size: .7rem; font-weight: 600; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; white-space: nowrap; text-decoration: underline dotted; }
 .delta.good { color: var(--good); }
 .delta.bad { color: var(--bad); }
 .progress { height: 14px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin: 10px 0 6px; }
