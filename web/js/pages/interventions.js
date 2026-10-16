@@ -13,19 +13,25 @@ let tab = 'interventions';
 let ivs = []; let bps = { rows: [], categories: [] };
 let filt = { restaurant_id: '', status: '', category_id: '' };
 let chart = null;
-let bpView = 'own'; let industry = null; // best practices: our own kitchens, or examples from the industry
+let industry = null; // curated examples from elsewhere (tab 'industry')
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const canManage = () => !!state.meta.permissions.dashboard;
 
 export async function renderInterventions(rest = []) {
-  tab = rest[0] === 'best-practices' || !canManage() ? 'best-practices' : 'interventions';
+  // Two worlds: our own kitchens (interventions, best practices) and examples from the industry
+  tab = rest[0] === 'industry' ? 'industry' : rest[0] === 'best-practices' || !canManage() ? 'best-practices' : 'interventions';
+  const own = tab !== 'industry';
+  filt.category_id = '';
   app().innerHTML = `
     <div class="page-head"><div><h1>${t(canManage() ? 'iv_title' : 'bp_title')}</h1><div class="muted small">${t(canManage() ? 'iv_sub' : 'bp_sub')}</div></div>
       <div class="page-actions no-print">
         <button type="button" class="btn-sm" id="iv-print">&#128424; ${t('print')}</button>
-        ${canManage() ? `<button type="button" class="btn-sm btn-primary" id="iv-new">+ ${t(tab === 'interventions' ? 'iv_new' : 'bp_new')}</button>` : ''}
+        ${canManage() && own ? `<button type="button" class="btn-sm btn-primary" id="iv-new">+ ${t(tab === 'interventions' ? 'iv_new' : 'bp_new')}</button>` : ''}
       </div></div>
-    ${canManage() ? `<div class="chips no-print" style="margin-bottom:14px">
+    <div class="chips no-print" style="margin-bottom:10px">
+      <a class="chip ${own ? 'on' : ''}" href="#/interventions${canManage() ? '' : '/best-practices'}">${t('bp_own')}</a>
+      <a class="chip ${!own ? 'on' : ''}" href="#/interventions/industry">${t('bp_industry')}</a></div>
+    ${canManage() && own ? `<div class="chips chips-sub no-print" style="margin-bottom:14px">
       <a class="chip ${tab === 'interventions' ? 'on' : ''}" href="#/interventions">${t('iv_tab')}</a>
       <a class="chip ${tab === 'best-practices' ? 'on' : ''}" href="#/interventions/best-practices">${t('bp_tab')}</a></div>` : ''}
     <div id="iv-filters"></div>
@@ -40,13 +46,13 @@ async function load() {
     if (tab === 'interventions') ivs = (await api('/interventions')).data || [];
     else {
       bps = (await api('/best-practices')).data || { rows: [], categories: [] };
-      if (canManage() && !ivs.length) ivs = (await api('/interventions')).data || [];
+      if (tab === 'best-practices' && canManage() && !ivs.length) ivs = (await api('/interventions')).data || [];
     }
   } catch (e) { toastError(e); $('#iv-body').innerHTML = ''; return; }
   draw();
 }
 
-function draw() { if (tab === 'interventions') drawInterventions(); else drawBestPractices(); }
+function draw() { if (tab === 'interventions') drawInterventions(); else if (tab === 'industry') drawIndustry(); else drawBestPractices(); }
 
 // ------------------------------------------------------------------ interventions
 function effectBadge(e, big = false) {
@@ -216,31 +222,20 @@ function shareAsBestPractice(iv, e) {
 }
 
 // ------------------------------------------------------------------ best practices
-// Switch between the organization's own best practices and the curated industry examples
-function bpViewChips() {
-  return `<div class="chips no-print" style="margin-bottom:10px">
-    <button type="button" class="chip ${bpView === 'own' ? 'on' : ''}" data-bpv="own">${t('bp_own')}</button>
-    <button type="button" class="chip ${bpView === 'industry' ? 'on' : ''}" data-bpv="industry">${t('bp_industry')}</button></div>`;
-}
-function bindBpView() {
-  $$('[data-bpv]').forEach((b) => (b.onclick = () => { bpView = b.dataset.bpv; filt.category_id = ''; drawBestPractices(); }));
-}
-
 async function drawIndustry() {
   const L = lang();
   const pick = (j) => (j ? j[L] || j.en || '' : '');
   if (!industry) {
     $('#iv-body').innerHTML = '<div class="card empty"><span class="spinner"></span></div>';
     try { industry = (await api('/industry-examples')).data || []; } catch (e) { toastError(e); industry = null; return; }
-    if (bpView !== 'industry') return;
+    if (tab !== 'industry') return;
   }
   const cats = bps.categories || [];
   const used = new Set(industry.map((r) => r.category_id));
-  $('#iv-filters').innerHTML = `${bpViewChips()}<div class="chips no-print" style="margin-bottom:14px">
+  $('#iv-filters').innerHTML = `<div class="chips no-print" style="margin-bottom:14px">
     <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
     ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>
     <p class="small muted" style="margin:-4px 2px 12px">${t('bp_industry_note')}</p>`;
-  bindBpView();
   $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawIndustry(); }));
   const rows = industry.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
   $('#iv-body').innerHTML = `<div class="bp-grid">${rows.map((r) => {
@@ -257,13 +252,11 @@ async function drawIndustry() {
 }
 
 function drawBestPractices() {
-  if (bpView === 'industry') { drawIndustry(); return; }
   const cats = bps.categories || [];
   const used = new Set(bps.rows.map((r) => r.category_id));
-  $('#iv-filters').innerHTML = bpViewChips() + (bps.rows.length ? `<div class="chips no-print" style="margin-bottom:14px" id="bp-cats">
+  $('#iv-filters').innerHTML = (bps.rows.length ? `<div class="chips no-print" style="margin-bottom:14px" id="bp-cats">
     <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
     ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>` : '');
-  bindBpView();
   $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawBestPractices(); }));
   const rows = bps.rows.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
   if (!rows.length) { $('#iv-body').innerHTML = `<div class="card empty">${t('bp_empty')}</div>`; return; }
