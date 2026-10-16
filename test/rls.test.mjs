@@ -720,3 +720,24 @@ test('sales switch: off by default, shown in app_meta', async () => {
   const m = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select app_meta(null, 'en') m`)).m);
   assert.equal(m.organization.sales_enabled, false);
 });
+
+test('inedible trim: counted in kg, not in avoidable value or leaderboard improvement; deleted supplier is no default', async () => {
+  const trim = (await db.query(`select id, avoidable from waste_reasons where code = 'inedible' and organization_id is null`)).rows[0];
+  assert.equal(trim.avoidable, false);
+  const before = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard(null, $1, current_date, current_date) d`, [ID.ams])).d);
+  const rec = await as(db, U['manager.amsterdam@hth'], async ({ one }) =>
+    one(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: trim.id, weight_kg: 2 })));
+  const after = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard(null, $1, current_date, current_date) d`, [ID.ams])).d);
+  assert.equal(Number(after.totals.kg) - Number(before.totals.kg), 2);
+  assert.equal(Number(after.totals.unavoidable_kg) - Number(before.totals.unavoidable_kg), 2);
+  assert.equal(Number(after.totals.unavoidable_value) - Number(before.totals.unavoidable_value), Number(rec.purchase_value));
+  assert.equal(after.by_reason.find((r) => r.id === trim.id).avoidable, false);
+  const meta = await as(db, U['student@hth'], async ({ one }) => (await one('select app_meta() m')).m);
+  assert.equal(meta.waste_reasons.find((r) => r.code === 'inedible').avoidable, false);
+  // supplier deleted: products lose it as default, so a registration of that product still saves
+  const sup = (await db.query(`insert into suppliers (organization_id, name) values ($1, 'Old supplier') returning id`, [ID.hth])).rows[0].id;
+  await db.query('update products set default_supplier_id = $1 where id = $2', [sup, ID.tomato]);
+  await db.query('update suppliers set deleted_at = now() where id = $1', [sup]);
+  assert.equal((await db.query('select default_supplier_id from products where id = $1', [ID.tomato])).rows[0].default_supplier_id, null);
+  await as(db, U['manager.amsterdam@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: ID.spoilage, weight_kg: 1 })));
+});

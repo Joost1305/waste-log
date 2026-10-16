@@ -122,13 +122,16 @@ function draw(d) {
     </div>` : `<div class="card muted small">${t('target_none')}</div>`;
 
   const showRest = state.meta.restaurants.length > 1 && !q.restaurant_id;
+  // Inedible trim (peel, seeds, bones) counts in kg and CO2, but is not money that could have been saved
+  const trimKg = Number(T.unavoidable_kg) || 0; const trimValue = Number(T.unavoidable_value) || 0;
   const co2Eq = equivalentsLine(Number(T.co2e_kg), t, fmt.num, { kitchen: true, max: 2 });
   body.innerHTML = `
     <div class="grid grid-kpi">
-      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div></div>
+      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div>
+        ${trimKg > 0 ? `<div class="delta muted">${t('trim_of', { kg: fmt.kg(trimKg, 1) })}</div>` : ''}</div>
       <button type="button" class="card kpi kpi-link" id="kpi-cost" title="${t('cost_hint')}"><div class="label">${t('kpi_cost')} <span class="info-i" aria-hidden="true">i</span></div>
-        <div class="value">${fmt.money(T.value)}</div>
-        <div class="delta muted">${t('purchase_value')} · <span class="link-ish">${t('co2_short')}</span></div></button>
+        <div class="value">${fmt.money(T.value - trimValue)}</div>
+        <div class="delta muted">${trimValue > 0 ? `${t('cost_avoidable')} · ${t('cost_trim', { v: fmt.money(trimValue) })}` : t('purchase_value')} · <span class="link-ish">${t('co2_short')}</span></div></button>
       <div class="card kpi"><div class="label">${t('kpi_per_guest')}</div><div class="value">${T.g_per_guest != null ? `${fmt.num(T.g_per_guest)} g` : '–'}</div>
         <div class="delta muted">${fmt.num(T.guests)} ${t('guests').toLowerCase()}</div></div>
       <button type="button" class="card kpi kpi-link" id="kpi-co2" title="${t('co2_hint')}"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>

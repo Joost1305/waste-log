@@ -135,6 +135,8 @@ function renderPhoto() {
       <strong>${esc((state.meta.products.find((x) => x.id === sg.product_id) || {}).name || sg.product_name)}</strong> · ${esc(cat ? cat.label : '')} · ${fmt.pct(sg.confidence * 100)} ${t('reg_ai_sure')}
       ${sg.menu_item_name ? `<div class="small" style="margin-top:4px">${t('reg_menu_item')}: <strong>${esc(sg.menu_item_name)}</strong></div>` : ''}
       ${sg.reason_id ? `<div class="small" style="margin-top:4px">${sg.is_plated_meal ? '&#127869; ' : ''}${t('reason')}: <strong>${esc((state.meta.waste_reasons.find((r) => r.id === sg.reason_id) || {}).label || '')}</strong></div>` : ''}
+      ${sg.edible_part && !s.skipEdible ? `<div class="small ai-split" style="margin-top:6px">&#9986; ${t('reg_split', { kg: sg.edible_part.suggested_weight_kg ? fmt.kg(sg.edible_part.suggested_weight_kg, 2) : '', name: esc(sg.edible_part.product_name) })}
+        <button type="button" class="link-btn" id="ai-split-skip">${t('reg_split_skip')}</button></div>` : ''}
       ${applied ? '' : `<div style="margin-top:6px"><button type="button" class="btn-sm btn-primary" id="ai-use">${t('reg_ai_use')}</button></div>`}
       <div class="ai-note">${t('reg_ai_note')}</div></div>`;
   } else ai = `<div class="ai-card off">${p.ai === 'off' ? t('reg_ai_off') : t('reg_ai_fail')}</div>`;
@@ -142,8 +144,15 @@ function renderPhoto() {
   el.innerHTML = `${head}<div class="photo-row"><img src="${p.url}" alt="">${ai}</div>
     <div style="margin-top:8px"><button type="button" class="btn-sm btn-ghost" id="photo-remove">${t('reg_remove')}</button></div>`;
   $('#photo-remove').onclick = () => { URL.revokeObjectURL(p.url); s.photo = null; renderPhoto(); updateSave(); };
+  const skip = $('#ai-split-skip');
+  if (skip) skip.onclick = () => { s.skipEdible = true; renderPhoto(); };
   const use = $('#ai-use');
   if (use) use.onclick = () => applySuggestion(p.suggestion);
+}
+
+// A product's default supplier, only when that supplier still exists (a deleted one blocked saving)
+function knownSupplier(id) {
+  return id && (state.meta.suppliers || []).some((x) => x.id === id) ? id : null;
 }
 
 function applySuggestion(sg) {
@@ -156,7 +165,7 @@ function applySuggestion(sg) {
   if (sg.menu_item_id && !s.menuItemId && state.meta.menu_items.some((m) => m.id === sg.menu_item_id)) s.menuItemId = sg.menu_item_id;
   applyWeight(sg);
   const prod = state.meta.products.find((x) => x.id === s.productId);
-  if (prod && prod.default_supplier_id) s.supplierId = prod.default_supplier_id;
+  if (prod) s.supplierId = knownSupplier(prod.default_supplier_id);
   renderPhoto(); renderWhat(); renderWeight(); renderReason(); renderMore(); updateSave();
 }
 
@@ -321,7 +330,7 @@ function renderWhat() {
     else {
       const p = meta.products.find((x) => x.id === id);
       s.productId = id; s.productName = ''; s.categoryId = p.waste_category_id;
-      if (p.default_supplier_id) s.supplierId = p.default_supplier_id;
+      s.supplierId = knownSupplier(p.default_supplier_id);
     }
     s.search = '';
     renderWhat(); renderMore(); updateSave(); renderPhoto();
@@ -488,8 +497,20 @@ async function save() {
     // One rotating kitchen comparison makes the CO2 of this registration tangible ("≈ a combi oven running for 2 hours")
     const eq = equivalentsLine(Number(rec.co2e_kg), t, fmt.num, { kitchen: true, rotate: true });
     toast(`${t('reg_saved')}: ${fmt.kg(rec.weight_kg, 2)} ${rec.product_name || catName} (${fmt.money(rec.purchase_value, 2)})${eq ? `\nCO₂ ${eq}` : ''}`, '', eq ? 4500 : undefined);
-    if (s.photo) URL.revokeObjectURL(s.photo.url);
-    s = freshState({ restaurantId: s.restaurantId });
+    const ep = sg && sg.edible_part && !s.skipEdible ? sg.edible_part : null;
+    if (ep && s.photo) {
+      // Mixed bin: the edible food in the same photo is the next registration (reason left for the user)
+      const photo = { url: s.photo.url, token: s.photo.token, ai: 'done', suggestion: {
+        product_id: ep.product_id, product_name: ep.product_name, waste_category_id: ep.waste_category_id,
+        confidence: sg.confidence, suggested_weight_kg: ep.suggested_weight_kg, weight_source: 'estimate', candidates: [] } };
+      s = freshState({ restaurantId: s.restaurantId });
+      s.photo = photo;
+      applySuggestion(photo.suggestion);
+      setTimeout(() => toast(t('reg_split_next', { name: ep.product_name }), '', 5000), 2500);
+    } else {
+      if (s.photo) URL.revokeObjectURL(s.photo.url);
+      s = freshState({ restaurantId: s.restaurantId });
+    }
     $('#sec-more').open = false;
     renderAll();
     window.scrollTo({ top: 0, behavior: 'smooth' });

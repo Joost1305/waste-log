@@ -11,7 +11,7 @@ const T: Record<Lang, Record<string, string>> = {
     target: 'Target', target_line: '{cur} in the last {d} days. Goal: {goal}, starting point: {base}.', reached: 'Goal reached', progress: '{p}% of the way',
     iv: 'Interventions running', iv_early: 'too early to tell', iv_ctrl: 'other restaurants {p}', bp: 'New best practices',
     open: 'Open the dashboard', foot: 'You receive this e-mail because your address is on the weekly e-mail list for {name} in WASTE log. A manager can change the list in Settings › Weekly e-mail.',
-    all: 'all restaurants', none: 'No waste was registered last week.', avg: 'average of the 4 weeks before: {kg}',
+    trim: 'avoidable · + {v} inedible trim', all: 'all restaurants', none: 'No waste was registered last week.', avg: 'average of the 4 weeks before: {kg}',
   },
   nl: {
     subject: 'Week {w}: {kg} voedselverspilling bij {name}', week: 'Week {w}', waste: 'Voedselverspilling', cost: 'Inkoopwaarde', per_guest: 'Per gast',
@@ -21,7 +21,7 @@ const T: Record<Lang, Record<string, string>> = {
     target: 'Doel', target_line: '{cur} in de laatste {d} dagen. Doel: {goal}, startpunt: {base}.', reached: 'Doel gehaald', progress: '{p}% van de weg',
     iv: 'Lopende interventies', iv_early: 'nog te vroeg', iv_ctrl: 'andere restaurants {p}', bp: 'Nieuwe best practices',
     open: 'Open het dashboard', foot: 'Je ontvangt deze e-mail omdat je adres op de wekelijkse e-maillijst van {name} in WASTE log staat. Een manager kan de lijst aanpassen via Beheer › Wekelijkse e-mail.',
-    all: 'alle restaurants', none: 'Vorige week is er geen waste geregistreerd.', avg: 'gemiddelde van de 4 weken ervoor: {kg}',
+    trim: 'vermijdbaar · + {v} niet-eetbaar snijafval', all: 'alle restaurants', none: 'Vorige week is er geen waste geregistreerd.', avg: 'gemiddelde van de 4 weken ervoor: {kg}',
   },
 };
 
@@ -49,13 +49,15 @@ export function renderReport(d: any, appUrl: string) {
   const h = (s: string) => `<h3 style="margin:22px 0 8px;font-size:15px;color:${ink}">${s}</h3>`;
   const ch = d.change_kg_pct;
   const missing = 7 - (w.active_days || 0);
+  // Inedible trim (peel, seeds, bones) is registered but is not money that could have been saved
+  const trimV = Number(d.unavoidable?.value) || 0;
 
   let body = '';
   if (!w.records) body += `<p style="color:${muted}">${L.none}</p>`;
   else {
     body += `<table role="presentation" width="100%" cellspacing="6" cellpadding="0" style="border-collapse:separate"><tr>
       ${kpi(L.waste, kg(w.kg), ch == null ? '' : ch === 0 ? L.same : `<span style="color:${ch < 0 ? good : bad};font-weight:600">${pct(ch)}</span> ${L.vs_prev}`)}
-      ${kpi(L.cost, money(w.value))}</tr><tr>
+      ${trimV > 0 ? kpi(L.cost, money((w.value || 0) - trimV), fill(L.trim, { v: money(trimV) })) : kpi(L.cost, money(w.value))}</tr><tr>
       ${kpi(L.per_guest, w.g_per_guest != null ? `${n(w.g_per_guest)} g` : '–', d.avg4_g_per_guest != null ? fill(L.avg, { kg: `${n(d.avg4_g_per_guest)} g` }) : '')}
       ${kpi(L.co2, kg(d.co2e_kg))}</tr></table>
       <p style="font-size:13px;color:${muted};margin:6px 6px 0">${fill(L.regs, { n: w.records, d: w.active_days })}</p>

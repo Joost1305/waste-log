@@ -135,6 +135,10 @@ Deno.serve(async (req) => {
     ...(categories.some((c) => c.code === 'soup') ? ['Soup (in a bowl, pot, pan or soup kettle) is category_code "soup", also when it is served.'] : []),
     dishes.length ? `dish: if the food is (part of) one of the restaurant's dishes, give its exact name from this list, otherwise null: ${dishes.map((d) => d.name).join('; ')}.` : 'dish: null.',
     `reason_code: the most likely reason, from exactly this list: ${reasons.map((r) => r.code).join(', ')}. A served plate with leftovers is "plate". Use null if you cannot tell.`,
+    ...(reasons.some((r) => r.code === 'inedible') ? [
+      'Inedible trim: if the waste is mostly parts nobody eats (peel, skins, seeds, cores, stalks, outer leaves, bones, shells, coffee grounds), reason_code is "inedible".',
+      'Mixed bin: if inedible trim lies together with clearly edible food (e.g. cucumber pieces among pumpkin peel and seeds), describe the trim as the product with reason_code "inedible" and suggested_weight_kg for the trim only, and put the edible food in edible_part (product, product_en, kg). Otherwise edible_part is null.',
+    ] : ['edible_part: null.']),
     'Weight: if a scale display is visible, read it, convert to kg and set weight_source to "scale".',
     'Otherwise estimate the weight of the wasted food in kg (not the plate or container) from its size and any reference objects, and set weight_source to "estimate".',
     'Only use null for suggested_weight_kg if there is no visible food at all.',
@@ -158,6 +162,7 @@ Deno.serve(async (req) => {
         components_en: { type: 'array', items: { type: 'string' } },
         reason_code: { type: ['string', 'null'], enum: [...reasons.map((r) => r.code), null] },
         dish: { type: ['string', 'null'] },
+        edible_part: { type: ['object', 'null'], properties: { product: { type: 'string' }, product_en: { type: 'string' }, kg: { type: 'number' } } },
         confidence: { type: 'number' },
         suggested_weight_kg: { type: ['number', 'null'] },
         weight_source: { type: ['string', 'null'], enum: ['scale', 'estimate', null] },
@@ -215,6 +220,20 @@ Deno.serve(async (req) => {
       : rankProducts([s.product, s.product_en || ''], products, uses);
     const product = plated ? null : (ranked.length ? ranked[0].p : null);
     const normName = (x: unknown) => String(x ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    // Edible food found among inedible trim: offered as a second registration with the same photo
+    let edible: any = null;
+    const ep = s.edible_part;
+    if (!plated && ep && typeof ep === 'object' && typeof ep.product === 'string' && ep.product.trim()) {
+      const kg = typeof ep.kg === 'string' ? Number(String(ep.kg).replace(',', '.')) : Number(ep.kg);
+      const best = rankProducts([ep.product, typeof ep.product_en === 'string' ? ep.product_en : ''], products, uses)[0]?.p || null;
+      const epCat = best?.waste_category_id ?? cat?.id ?? null;
+      if (epCat) edible = {
+        product_id: best ? best.id : null,
+        product_name: best ? best.name : (body.lang === 'en' && ep.product_en ? String(ep.product_en).slice(0, 80) : ep.product.slice(0, 80)),
+        waste_category_id: epCat,
+        suggested_weight_kg: kg > 0 && kg <= 200 ? Math.round(kg * 1000) / 1000 : null,
+      };
+    }
     const dish = typeof s.dish === 'string' ? dishes.find((d) => normName(d.name) === normName(s.dish)) || null : null;
     return json({ ok: true, data: { ok: true, available: true, suggestion: {
       product_text: s.product,
@@ -228,6 +247,7 @@ Deno.serve(async (req) => {
       menu_item_id: dish ? dish.id : null,
       menu_item_name: dish ? dish.name : null,
       reason_code: reason?.code ?? null,
+      edible_part: edible,
       category_code: cat?.code ?? null,
       subcategory: typeof s.subcategory === 'string' ? s.subcategory.slice(0, 80) : null,
       confidence: Math.round(s.confidence * 100) / 100,
