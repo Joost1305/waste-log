@@ -204,11 +204,13 @@ function draw(d) {
   }));
   const hbar = (el, rows) => new Chart(el, {
     type: 'bar',
-    data: { labels: rows.map((r) => r.name), datasets: [{ data: rows.map((r) => Math.round(r.kg)), backgroundColor: primary, borderRadius: 4, maxBarThickness: 22 }] },
+    data: { labels: rows.map((r) => r.name), datasets: [{ data: rows.map((r) => Math.round(r.kg)),
+      // inedible trim: grey bar, and no euros (it is not money that could have been saved)
+      backgroundColor: rows.map((r) => (r.avoidable === false ? ink2 : primary)), borderRadius: 4, maxBarThickness: 22 }] },
     options: { ...base, indexAxis: 'y',
       scales: { x: { ...base.scales.y }, y: { ...base.scales.x, ticks: { color: css('--ink'), font: { size: 12 } } } },
       plugins: { ...base.plugins, tooltip: { ...base.plugins.tooltip, callbacks: {
-        label: (c) => { const r = rows[c.dataIndex]; return `${fmt.kg(r.kg, 1)} · ${fmt.money(r.value)} · ${fmt.pct((r.kg / T.kg) * 100)}`; } } } } },
+        label: (c) => { const r = rows[c.dataIndex]; return `${fmt.kg(r.kg, 1)} · ${r.avoidable === false ? t('trim_no_cost') : fmt.money(r.value)} · ${fmt.pct((r.kg / T.kg) * 100)}`; } } } } },
   });
   charts.push(hbar($('#c-cat'), d.by_category));
   charts.push(hbar($('#c-reason'), d.by_reason));
