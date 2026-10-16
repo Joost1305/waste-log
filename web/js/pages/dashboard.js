@@ -56,6 +56,38 @@ async function load() {
   } catch (e) { toastError(e); body.innerHTML = ''; }
 }
 
+// Sales from the till: waste as % of food sales, per 100 dishes sold, and per dish sold versus wasted
+async function loadSales() {
+  const box = $('#dash-sales');
+  // Only when the organization uses sales reports (Settings › Organization)
+  if (!box || !(state.meta.organization && state.meta.organization.sales_enabled)) return;
+  let s;
+  try { s = (await api('/sales-summary', { query: { restaurant_id: q.restaurant_id, from: q.from, to: q.to } })).data; } catch { return; }
+  if (!s || !s.has_sales) {
+    box.innerHTML = `<div class="card muted small" style="margin-top:16px">${t('ds_no_sales')} <a href="#/settings/sales">${t('sl_title')}</a></div>`;
+    return;
+  }
+  const dishes = (s.dishes || []).filter((d) => d.sold > 0 || d.waste_kg > 0);
+  box.innerHTML = `<div class="card" style="margin-top:16px"><h2>${t('ds_sales_title')}</h2>
+    <div class="grid grid-kpi" style="margin-top:4px">
+      <div class="kpi"><div class="label">${t('ds_pct_sales')}</div><div class="value">${s.waste_pct_of_food_sales != null ? fmt.pct(s.waste_pct_of_food_sales, 1) : '–'}</div>
+        <div class="delta muted">${fmt.money(s.waste_value)} / ${fmt.money(s.food_sales_excl)}</div></div>
+      <div class="kpi"><div class="label">${t('ds_food_sales')}</div><div class="value">${fmt.money(s.food_sales_excl)}</div>
+        <div class="delta muted">${t('ds_excl_vat')}</div></div>
+      <div class="kpi"><div class="label">${t('ds_per_100')}</div><div class="value">${s.waste_kg_per_100_dishes != null ? fmt.kg(s.waste_kg_per_100_dishes, 1) : '–'}</div>
+        <div class="delta muted">${t('ds_dishes_sold', { n: fmt.num(s.dishes_sold) })}</div></div>
+    </div>
+    <p class="small muted" style="margin:10px 0 0">${t('ds_cover', { a: s.days_covered, b: s.window_days })}
+      ${s.unlinked_qty > 0 ? ` ${t('ds_unlinked', { n: fmt.num(s.unlinked_qty) })} <a href="#/settings/menu">${t('tl_btn')}</a>` : ''}</p>
+    ${dishes.length ? `<h3 style="margin:16px 0 6px">${t('ds_per_dish')}</h3>${table(
+      [t('reg_menu_item'), t('tl_sold'), t('wasted'), t('ds_per_100_short'), t('ds_of_served')],
+      dishes.map((d) => [esc(d.name), fmt.num(d.sold), d.waste_kg ? fmt.kg(d.waste_kg, 1) : '–',
+        d.waste_per_100 != null && d.waste_kg ? fmt.kg(d.waste_per_100, 1) : '–',
+        d.waste_pct != null && d.waste_kg ? fmt.pct(d.waste_pct, 1) : (d.portion_g ? '–' : `<span class="small muted">${t('ds_no_portion')}</span>`)]),
+      [false, true, true, true, true])}` : ''}
+  </div>`;
+}
+
 function delta(pct, goodWhenDown = true) {
   if (pct == null) return `<div class="delta muted">&nbsp;</div>`;
   const good = goodWhenDown ? pct <= 0 : pct >= 0;
@@ -105,6 +137,7 @@ function draw(d) {
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
     </div>
     <div style="margin-top:16px">${targetHtml}</div>
+    <div id="dash-sales"></div>
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card"><h2>${t('trend')} (kg)</h2><div class="chart-box"><canvas id="c-trend"></canvas></div></div>
       <div class="card"><h2>${t('trend_guest')}</h2><div class="chart-box"><canvas id="c-trend-guest"></canvas></div></div>
@@ -135,6 +168,7 @@ function draw(d) {
       <div class="note">${t('rate_note')}</div>
     </div>`;
 
+  loadSales();
   $('#kpi-co2').onclick = () => showCo2Info(null, null, Number(T.co2e_kg));
   $('#kpi-cost').onclick = () => showCostInfo(d.valuation_mix, T.value, state.meta.organization.default_value_per_kg);
 

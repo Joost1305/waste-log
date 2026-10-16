@@ -12,7 +12,7 @@ let q; let items = []; let total = 0;
 
 export async function renderGallery() {
   const meta = state.meta;
-  q = { restaurant_id: '', waste_category_id: '', preset: '28', sort: 'heaviest', offset: 0 };
+  q = { restaurant_id: '', waste_category_id: '', weight: '', preset: '28', sort: 'heaviest', offset: 0 };
   app().innerHTML = `
     <div id="gal-print-head"></div>
     <div class="page-head"><div><h1>${t('gal_title')}</h1><div class="muted small">${t('gal_sub')}</div></div>
@@ -25,6 +25,8 @@ export async function renderGallery() {
         <option value="84">${t('p_12w')}</option><option value="all">${t('gal_all')}</option></select></div>
       <div><label>${t('category')}</label><select name="waste_category_id"><option value="">${t('all')}</option>
         ${meta.waste_categories.map((c) => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}</select></div>
+      <div><label>${t('gal_weight')}</label><select name="weight"><option value="">${t('all')}</option>
+        <option value="estimate">${t('gal_w_estimate')}</option><option value="measured">${t('gal_w_measured')}</option></select></div>
       <div><label>${t('gal_sort')}</label><select name="sort">
         ${SORTS.map((s) => `<option value="${s}" ${s === q.sort ? 'selected' : ''}>${t('sort_' + s)}</option>`).join('')}</select></div>
     </form>
@@ -44,7 +46,7 @@ function periodLabel() {
 async function load(reset) {
   if (reset) { q.offset = 0; items = []; $('#gal-grid').innerHTML = `<div class="card empty"><span class="spinner"></span></div>`; }
   const query = {
-    restaurant_id: q.restaurant_id, waste_category_id: q.waste_category_id, limit: PAGE, offset: q.offset, sort: q.sort,
+    restaurant_id: q.restaurant_id, waste_category_id: q.waste_category_id, weight: q.weight, limit: PAGE, offset: q.offset, sort: q.sort,
     from: q.preset === 'all' ? '' : addDaysIso(todayIso(), -(Number(q.preset) - 1)), to: todayIso(),
   };
   try {
@@ -59,7 +61,7 @@ async function load(reset) {
       ? `${fmt.num(total)} ${t('gal_photos')} · <strong>${fmt.kg(res.meta.total_kg)}</strong> · ${fmt.money(res.meta.total_value)}`
       : '';
     const rest = q.restaurant_id ? (state.meta.restaurants.find((r) => r.id === Number(q.restaurant_id)) || {}).name : t('all_restaurants');
-    $('#gal-print-head').innerHTML = printHeader(t('gal_title'), `${rest} · ${periodLabel()} · ${t('sort_' + q.sort)}`);
+    $('#gal-print-head').innerHTML = printHeader(t('gal_title'), `${rest} · ${periodLabel()}${q.weight ? ` · ${t('gal_w_' + q.weight)}` : ''} · ${t('sort_' + q.sort)}`);
     draw();
   } catch (e) { toastError(e); $('#gal-grid').innerHTML = ''; }
 }

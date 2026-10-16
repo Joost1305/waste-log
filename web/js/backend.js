@@ -113,7 +113,7 @@ route('POST', '/organizations/:id/admin', async ({ p, body }) => invoke('admin-u
   language: body.language || 'en', invite: true, is_active: true, restaurant_ids: [], redirect_to: `${location.origin}${location.pathname}` }));
 route('GET', '/organization', async () => check(await sb.from('organizations').select('*').eq('id', ctx.orgId).single()));
 route('PATCH', '/organization', async ({ body }) =>
-  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start'])).eq('id', ctx.orgId).select().single()));
+  check(await sb.from('organizations').update(pick(body, ['name', 'default_value_per_kg', 'default_language', 'currency', 'weather_enabled', 'leaderboard_enabled', 'leaderboard_prize', 'leaderboard_period', 'leaderboard_season_start', 'sales_enabled'])).eq('id', ctx.orgId).select().single()));
 
 // restaurants
 route('GET', '/restaurants', async () => check(await sb.from('restaurants').select('*').eq('organization_id', ctx.orgId).is('deleted_at', null).order('name')));
@@ -293,7 +293,7 @@ route('GET', '/gallery', async ({ query }) => {
   const res = check(await sb.rpc('gallery', {
     p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
     p_category: num(query.waste_category_id), p_limit: num(query.limit) || 24, p_offset: num(query.offset) || 0, p_lang: ctx.lang,
-    p_sort: query.sort || 'heaviest',
+    p_sort: query.sort || 'heaviest', p_weight: ['estimate', 'measured'].includes(query.weight) ? query.weight : null,
   }));
   return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
 });
