@@ -5,7 +5,7 @@
 // Best practices: short stories (problem, solution, result) with an optional photo or PDF. Everyone in the
 // organization can read published ones; managers write them for their own restaurants.
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, openModal, confirmDialog, formHtml, readForm, printPage } from '../core.js';
-import { t } from '../i18n.js';
+import { t, lang } from '../i18n.js';
 import { documentUrl } from '../backend.js';
 
 const STATUSES = ['planned', 'active', 'completed', 'stopped'];
@@ -13,6 +13,7 @@ let tab = 'interventions';
 let ivs = []; let bps = { rows: [], categories: [] };
 let filt = { restaurant_id: '', status: '', category_id: '' };
 let chart = null;
+let bpView = 'own'; let industry = null; // best practices: our own kitchens, or examples from the industry
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const canManage = () => !!state.meta.permissions.dashboard;
 
@@ -215,12 +216,54 @@ function shareAsBestPractice(iv, e) {
 }
 
 // ------------------------------------------------------------------ best practices
+// Switch between the organization's own best practices and the curated industry examples
+function bpViewChips() {
+  return `<div class="chips no-print" style="margin-bottom:10px">
+    <button type="button" class="chip ${bpView === 'own' ? 'on' : ''}" data-bpv="own">${t('bp_own')}</button>
+    <button type="button" class="chip ${bpView === 'industry' ? 'on' : ''}" data-bpv="industry">${t('bp_industry')}</button></div>`;
+}
+function bindBpView() {
+  $$('[data-bpv]').forEach((b) => (b.onclick = () => { bpView = b.dataset.bpv; filt.category_id = ''; drawBestPractices(); }));
+}
+
+async function drawIndustry() {
+  const L = lang();
+  const pick = (j) => (j ? j[L] || j.en || '' : '');
+  if (!industry) {
+    $('#iv-body').innerHTML = '<div class="card empty"><span class="spinner"></span></div>';
+    try { industry = (await api('/industry-examples')).data || []; } catch (e) { toastError(e); industry = null; return; }
+    if (bpView !== 'industry') return;
+  }
+  const cats = bps.categories || [];
+  const used = new Set(industry.map((r) => r.category_id));
+  $('#iv-filters').innerHTML = `${bpViewChips()}<div class="chips no-print" style="margin-bottom:14px">
+    <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
+    ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>
+    <p class="small muted" style="margin:-4px 2px 12px">${t('bp_industry_note')}</p>`;
+  bindBpView();
+  $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawIndustry(); }));
+  const rows = industry.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
+  $('#iv-body').innerHTML = `<div class="bp-grid">${rows.map((r) => {
+    const cat = cats.find((c) => c.id === r.category_id);
+    return `<article class="card bp-card">
+      <div class="small muted">${cat ? `<span class="badge green">${esc(cat.label)}</span> ` : ''}${esc(r.who)}${r.place ? ` · ${esc(r.place)}` : ''}${r.year ? ` · ${esc(r.year === 'ongoing' ? t('bp_ongoing') : r.year)}` : ''}</div>
+      <h3>${esc(pick(r.title))}</h3>
+      ${r.result_change_pct != null ? `<div class="iv-effect ${r.result_change_pct <= 0 ? 'good' : 'bad'}">${r.result_change_pct > 0 ? '+' : '−'}${fmt.pct(Math.abs(r.result_change_pct), 0)} <span>${t('bp_waste')}</span></div>` : ''}
+      <div class="bp-sec"><strong>${t('bp_solution')}</strong><p>${esc(pick(r.solution))}</p></div>
+      ${r.result ? `<div class="bp-sec"><strong>${t('bp_result')}</strong><p>${esc(pick(r.result))}</p></div>` : ''}
+      <div class="small" style="margin-top:8px">${t('bp_source')}: <a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(r.source_name)}</a></div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
 function drawBestPractices() {
+  if (bpView === 'industry') { drawIndustry(); return; }
   const cats = bps.categories || [];
   const used = new Set(bps.rows.map((r) => r.category_id));
-  $('#iv-filters').innerHTML = bps.rows.length ? `<div class="chips no-print" style="margin-bottom:14px" id="bp-cats">
+  $('#iv-filters').innerHTML = bpViewChips() + (bps.rows.length ? `<div class="chips no-print" style="margin-bottom:14px" id="bp-cats">
     <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
-    ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>` : '';
+    ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>` : '');
+  bindBpView();
   $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawBestPractices(); }));
   const rows = bps.rows.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
   if (!rows.length) { $('#iv-body').innerHTML = `<div class="card empty">${t('bp_empty')}</div>`; return; }

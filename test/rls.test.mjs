@@ -741,3 +741,20 @@ test('inedible trim: counted in kg, not in avoidable value or leaderboard improv
   assert.equal((await db.query('select default_supplier_id from products where id = $1', [ID.tomato])).rows[0].default_supplier_id, null);
   await as(db, U['manager.amsterdam@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: ID.spoilage, weight_kg: 1 })));
 });
+
+test('gallery hides inedible trim by default; industry examples readable by everyone', async () => {
+  const trim = (await db.query(`select id from waste_reasons where code = 'inedible' and organization_id is null`)).rows[0].id;
+  const path = (await db.query(`select 'org-' || $1 || '/t/trim.jpg' p`, [ID.hth])).rows[0].p;
+  await as(db, U['manager.amsterdam@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: trim, weight_kg: 3, photo_path: path })));
+  const g = (o) => as(db, U['orgadmin@hth'], async ({ one }) =>
+    (await one(`select gallery_photos(null, null, null, null, null, 100, 0, 'en', 'heaviest', null, $1) g`, [o])).g);
+  const hide = await g(null); const show = await g('show'); const only = await g('only');
+  assert.ok(!hide.rows.some((r) => r.photo_path === path));
+  assert.ok(show.rows.some((r) => r.photo_path === path));
+  assert.ok(only.rows.length >= 1 && only.rows.every((r) => r.reason === 'Inedible trim (peel, seeds, bones)'));
+  assert.equal(show.total, hide.total + only.total);
+  const ex = await as(db, U['student@hth'], ({ q }) => q('select code, source_url from industry_examples'));
+  assert.equal(ex.length, 15);
+  assert.ok(ex.every((r) => r.source_url.startsWith('https://')) && !ex.some((r) => /orbisk|winnow/i.test(r.code + r.source_url)));
+  await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`insert into industry_examples (code, who, title, solution, source_name, source_url) values ('x','x','{}','{}','x','https://x')`)));
+});

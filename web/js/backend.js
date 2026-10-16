@@ -290,10 +290,11 @@ route('GET', '/top-products', async ({ query }) =>
 
 // gallery: photos, heaviest first
 route('GET', '/gallery', async ({ query }) => {
-  const res = check(await sb.rpc('gallery', {
+  const res = check(await sb.rpc('gallery_photos', {
     p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
     p_category: num(query.waste_category_id), p_limit: num(query.limit) || 24, p_offset: num(query.offset) || 0, p_lang: ctx.lang,
     p_sort: query.sort || 'heaviest', p_weight: ['estimate', 'measured'].includes(query.weight) ? query.weight : null,
+    p_trim: ['show', 'only'].includes(query.trim) ? query.trim : null,
   }));
   return { __meta: { total: res.total, total_kg: res.total_kg, total_value: res.total_value }, rows: res.rows };
 });
@@ -332,6 +333,9 @@ route('DELETE', '/interventions/:id', async ({ p }) => softDelete('interventions
 // best practices: a short story (problem, solution, result) with an optional photo or PDF
 const BP_FIELDS = ['restaurant_id', 'intervention_id', 'category_id', 'title', 'problem', 'solution', 'result', 'result_change_pct', 'status',
   'attachment_path', 'attachment_name', 'attachment_type'];
+// examples from elsewhere (same list for every organization, read-only)
+route('GET', '/industry-examples', async () =>
+  check(await sb.from('industry_examples').select('id, code, who, place, year, category_id, title, solution, result, result_change_pct, source_name, source_url, reason_codes').order('sort_order')));
 route('GET', '/best-practices', async () => check(await sb.rpc('best_practices_list', { p_org: ctx.orgId, p_lang: ctx.lang })));
 route('POST', '/best-practices', async ({ body }) =>
   check(await sb.from('best_practices').insert({ ...pick(body, BP_FIELDS), organization_id: ctx.orgId }).select('id').single()));
