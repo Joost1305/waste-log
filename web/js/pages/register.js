@@ -2,6 +2,7 @@
 // Photo -> (AI suggestion) -> what -> weight -> reason -> save. Everything else is optional.
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, confirmDialog, openModal } from '../core.js';
 import { t } from '../i18n.js';
+import { equivalentsLine } from '../co2-equivalents.js';
 
 const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent', section: 'fw_reg_section_' };
 
@@ -484,7 +485,9 @@ async function save() {
       localStorage.setItem(LS.recent, JSON.stringify(ids));
     }
     const catName = (state.meta.waste_categories.find((c) => c.id === rec.waste_category_id) || {}).label || '';
-    toast(`${t('reg_saved')}: ${fmt.kg(rec.weight_kg, 2)} ${rec.product_name || catName} (${fmt.money(rec.purchase_value, 2)})`);
+    // One rotating kitchen comparison makes the CO2 of this registration tangible ("≈ a combi oven running for 2 hours")
+    const eq = equivalentsLine(Number(rec.co2e_kg), t, fmt.num, { kitchen: true, rotate: true });
+    toast(`${t('reg_saved')}: ${fmt.kg(rec.weight_kg, 2)} ${rec.product_name || catName} (${fmt.money(rec.purchase_value, 2)})${eq ? `\nCO₂ ${eq}` : ''}`, '', eq ? 4500 : undefined);
     if (s.photo) URL.revokeObjectURL(s.photo.url);
     s = freshState({ restaurantId: s.restaurantId });
     $('#sec-more').open = false;

@@ -259,7 +259,7 @@ route('POST', '/waste', async ({ body }) => {
   if (['manual', 'scale', 'estimate'].includes(body.weight_source)) row.weight_source = body.weight_source;
   if (body.ai_suggestion) { row.ai_suggestion = body.ai_suggestion; row.ai_accepted = body.ai_accepted ?? null; }
   if (row.weight_kg > 500) throw new ApiError(400, 'Weight above 500 kg in one record, please check the unit');
-  return check(await sb.from('waste_records').insert(row).select('id, product_name, waste_category_id, section_id, weight_kg, purchase_value, valuation_method').single());
+  return check(await sb.from('waste_records').insert(row).select('id, product_name, waste_category_id, section_id, weight_kg, purchase_value, valuation_method, co2e_kg').single());
 });
 route('PATCH', '/waste/:id', async ({ p, body }) =>
   check(await sb.from('waste_records').update(wasteRow(body)).eq('id', p.id).select('id'), true)[0]);

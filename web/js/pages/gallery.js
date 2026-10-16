@@ -4,6 +4,7 @@ import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, 
 import { t } from '../i18n.js';
 import { photoUrls } from '../backend.js';
 import { showCo2Info } from '../co2.js';
+import { equivalentsLine } from '../co2-equivalents.js';
 
 const PAGE = 24;
 const SORTS = ['heaviest', 'lightest', 'category', 'newest'];
@@ -115,7 +116,8 @@ function open(r) {
       ${r.weight_source === 'estimate' ? `<span class="badge warn">${t('badge_estimate')}</span>` : ''}</h2>
     <div class="muted">${esc(r.category)} · ${esc(r.reason)} · ${esc(r.restaurant_name)}</div>
     <div style="margin-top:8px">${t('value')}: <strong>${fmt.money(r.purchase_value, 2)}</strong> ·
-      <button type="button" class="link-btn" id="gal-co2" title="${t('co2_hint')}">CO₂-eq: ${fmt.kg(r.co2e_kg, 1)} <span class="info-i" aria-hidden="true">i</span></button></div>
+      <button type="button" class="link-btn" id="gal-co2" title="${t('co2_hint')}">CO₂-eq: ${fmt.kg(r.co2e_kg, 1)} <span class="info-i" aria-hidden="true">i</span></button>
+      ${(() => { const eq = equivalentsLine(Number(r.co2e_kg), t, fmt.num, { kitchen: true }); return eq ? `<div class="small muted">${eq}</div>` : ''; })()}</div>
     <div class="small muted" style="margin-top:4px">${fmt.dateTime(r.recorded_at)}${r.user_name ? ' · ' + esc(r.user_name) : ''}</div>
     ${r.note ? `<p>${esc(r.note)}</p>` : ''}
     <div class="modal-actions">

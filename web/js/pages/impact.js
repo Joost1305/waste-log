@@ -4,6 +4,7 @@
 import { api, app, esc, fmt, $, renderLangToggle } from '../core.js';
 import { t } from '../i18n.js';
 import { showCo2Info } from '../co2.js';
+import { equivalentsLine } from '../co2-equivalents.js';
 
 let chart = null;
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -21,6 +22,8 @@ export async function renderImpact(rest) {
     return;
   }
   const L = d.last30 || {};
+  // Public visitors: everyday images first (km by car, flights), then a kitchen one
+  const co2Eq = equivalentsLine(Number(L.co2e_kg), t, fmt.num, { kitchen: false, max: 2 });
   const change = L.prev_kg > 0 ? ((L.kg - L.prev_kg) / L.prev_kg) * 100 : null;
   const place = d.scope === 'restaurant' ? d.restaurants[0] : null;
   const title = place ? place.name : t('imp_pub_all', { org: d.organization });
@@ -46,6 +49,7 @@ export async function renderImpact(rest) {
         <div class="delta muted">${t('imp_pub_per_guest_note')}</div></div>
       <button type="button" class="card kpi kpi-link" id="imp-co2"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${L.co2e_kg >= 1000 ? `${fmt.num(L.co2e_kg / 1000, 1)} t` : fmt.kg(L.co2e_kg, 0)}</div>
+        ${co2Eq ? `<div class="eq">${co2Eq}</div>` : ''}
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
       <div class="card kpi"><div class="label">${t('imp_pub_records')}</div><div class="value">${fmt.num(L.records)}</div>
         <div class="delta muted">${t('imp_pub_records_note')}</div></div>
@@ -74,7 +78,7 @@ export async function renderImpact(rest) {
 
   renderLangToggle($('#imp-lang'));
   $('#imp-print').onclick = () => window.print();
-  $('#imp-co2').onclick = () => showCo2Info(null, d.co2_factors);
+  $('#imp-co2').onclick = () => showCo2Info(null, d.co2_factors, Number(L.co2e_kg));
   drawTrend(d.trend);
 }
 

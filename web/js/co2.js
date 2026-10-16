@@ -2,11 +2,13 @@
 // Opened by clicking any CO2 figure. Factors and sources come from the database.
 import { api, esc, fmt, openModal, toastError, state } from './core.js';
 import { t } from './i18n.js';
+import { EQUIVALENTS, equivalent, describeEquivalent, pickEquivalents } from './co2-equivalents.js';
 
 let cache = null;
 
 // record (optional): { weight_kg, co2e_kg, waste_category_id } to show this registration's own calculation
-export async function showCo2Info(record, given) {
+// total (optional): a CO2 amount (kg) shown on the page, translated into everyday comparisons
+export async function showCo2Info(record, given, total) {
   // `given`: factors handed in by a page that has them already (the public page, where visitors are not signed in)
   try {
     if (!given && !cache) cache = (await api('/co2-factors')).data;
@@ -35,7 +37,26 @@ export async function showCo2Info(record, given) {
       ${s.co2e_source_url ? `<br><a href="${esc(s.co2e_source_url)}" target="_blank" rel="noopener">${t('co2_open_source')} &#8599;</a>` : ''}</p>`).join('') : `<p class="small muted">–</p>`}
     <p class="small muted">${t('co2_licence')}</p>
     <div class="note">${t('co2_caveat')}</div>
+    ${equivalentsHtml(record ? Number(record.co2e_kg) : total)}
     <div class="modal-actions"><button data-close>${t('close')}</button></div>`);
+}
+
+// "What does this mean?": the amount in everyday terms, the comparison table and its sources
+function equivalentsHtml(kg) {
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const mine = kg > 0 ? pickEquivalents(kg, { kitchen: true, max: 4 }) : [];
+  const unitText = (e) => cap(describeEquivalent({ ...equivalent(e.per_unit, e.code), count: 1 }, t, fmt.num));
+  return `
+    <h3 style="margin-top:18px">${t('eq_title')}</h3>
+    <p class="small">${t('eq_intro')}</p>
+    ${mine.length ? `<p><strong>${fmt.kg(kg, kg < 10 ? 1 : 0)} CO₂-eq</strong>. ${t('eq_this')}:</p>
+      <ul>${mine.map((q) => `<li>${esc(describeEquivalent(q, t, fmt.num))}</li>`).join('')}</ul>` : ''}
+    <div class="table-wrap"><table><thead><tr><th>${t('eq_compare')}</th><th class="right">${t('eq_factor')}</th></tr></thead><tbody>
+      ${EQUIVALENTS.map((e) => `<tr><td>${esc(unitText(e))}</td><td class="right num">${fmt.num(e.per_unit, 2)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <details style="margin-top:8px"><summary class="small">${t('eq_sources')}</summary>
+      ${EQUIVALENTS.map((e) => `<p class="small">${esc(e.source)}<br><a href="${esc(e.source_url)}" target="_blank" rel="noopener">${t('co2_open_source')} &#8599;</a></p>`).join('')}
+    </details>`;
 }
 
 export function resetCo2Cache() { cache = null; }

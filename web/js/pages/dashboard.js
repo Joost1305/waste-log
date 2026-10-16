@@ -5,6 +5,7 @@ import { state, api, app, esc, fmt, toastError, todayIso, addDaysIso, $, $$, pri
 import { t } from '../i18n.js';
 import { exportDashboard } from '../export.js';
 import { showCo2Info } from '../co2.js';
+import { equivalentsLine } from '../co2-equivalents.js';
 import { showCostInfo } from '../cost.js';
 
 const charts = [];
@@ -89,6 +90,7 @@ function draw(d) {
     </div>` : `<div class="card muted small">${t('target_none')}</div>`;
 
   const showRest = state.meta.restaurants.length > 1 && !q.restaurant_id;
+  const co2Eq = equivalentsLine(Number(T.co2e_kg), t, fmt.num, { kitchen: true, max: 2 });
   body.innerHTML = `
     <div class="grid grid-kpi">
       <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div></div>
@@ -99,6 +101,7 @@ function draw(d) {
         <div class="delta muted">${fmt.num(T.guests)} ${t('guests').toLowerCase()}</div></div>
       <button type="button" class="card kpi kpi-link" id="kpi-co2" title="${t('co2_hint')}"><div class="label">${t('kpi_co2')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${T.co2e_kg >= 1000 ? `${fmt.num(T.co2e_kg / 1000, 1)} t` : fmt.kg(T.co2e_kg, 0)}</div>
+        ${co2Eq ? `<div class="eq">${co2Eq}</div>` : ''}
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
     </div>
     <div style="margin-top:16px">${targetHtml}</div>
@@ -132,7 +135,7 @@ function draw(d) {
       <div class="note">${t('rate_note')}</div>
     </div>`;
 
-  $('#kpi-co2').onclick = () => showCo2Info();
+  $('#kpi-co2').onclick = () => showCo2Info(null, null, Number(T.co2e_kg));
   $('#kpi-cost').onclick = () => showCostInfo(d.valuation_mix, T.value, state.meta.organization.default_value_per_kg);
 
   const ink2 = css('--ink-2'); const line = css('--line'); const primary = css('--primary');

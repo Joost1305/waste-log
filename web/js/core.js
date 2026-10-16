@@ -66,12 +66,12 @@ export function esc(s) {
 export const app = () => document.getElementById('app');
 
 let toastTimer;
-export function toast(msg, type = '') {
+export function toast(msg, type = '', ms) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className = `toast show ${type}`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.className = 'toast'; }, type === 'error' ? 4500 : 2600);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, ms || (type === 'error' ? 4500 : 2600));
 }
 export function toastError(e) {
   const details = e.body && e.body.error && e.body.error.details;
