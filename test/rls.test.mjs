@@ -758,3 +758,34 @@ test('gallery hides inedible trim by default; industry examples readable by ever
   assert.ok(ex.every((r) => r.source_url.startsWith('https://')) && !ex.some((r) => /orbisk|winnow/i.test(r.code + r.source_url)));
   await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`insert into industry_examples (code, who, title, solution, source_name, source_url) values ('x','x','{}','{}','x','https://x')`)));
 });
+
+test('missing days: kg per day only counts registered days; daily series, streak and usage health', async () => {
+  const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
+  if (Number(d.totals.kg) > 0) {
+    assert.ok(d.totals.registered_days >= 1);
+    assert.equal(Number(d.totals.kg_per_day), Math.round((Number(d.totals.kg) / d.totals.registered_days) * 100) / 100);
+  }
+  const daily = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard_daily(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
+  assert.ok(daily.days.length >= 365);
+  const last = daily.days[daily.days.length - 1];
+  assert.equal(last.d, daily.today);
+  assert.ok(['n', 'kg', 'akg', 'guests', 'tmax', 'rain', 'open'].every((k) => k in last));
+  // a day without registrations is n = 0 (the page treats it as "no data"); guests only on registered days
+  assert.ok(daily.days.filter((x) => x.n === 0).every((x) => x.guests == null));
+  // managers only, and only their own organization's restaurants
+  await assert.rejects(as(db, U['student@hth'], ({ one }) => one(`select dashboard_daily(null, null, null, null)`)));
+  await assert.rejects(as(db, U['admin@bistro'], ({ one }) => one(`select dashboard_daily(null, $1, null, null)`, [ID.ams])));
+  // streak: everyone with access to the restaurant; today counts once registered
+  await as(db, U['manager.amsterdam@hth'], ({ one }) => one(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: ID.spoilage, weight_kg: 0.5 })));
+  const st = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one(`select registration_streak($1) s`, [ID.ams])).s);
+  assert.equal(st.today, true);
+  assert.ok(st.current >= 1 && st.best >= st.current);
+  await assert.rejects(as(db, U['admin@bistro'], ({ one }) => one(`select registration_streak($1)`, [ID.ams])));
+  // usage health: Amsterdam registered today, so it is active with nothing missed
+  const h = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select usage_health(null) h`)).h);
+  const ams = h.rows.find((r) => r.restaurant_id === ID.ams);
+  assert.equal(ams.status, 'active');
+  assert.equal(ams.missed, 0);
+  assert.ok(!h.rows.some((r) => r.restaurant_id === ID.bistroRest));
+  await assert.rejects(as(db, U['student@hth'], ({ one }) => one(`select usage_health(null)`)));
+});

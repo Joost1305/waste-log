@@ -3,8 +3,14 @@
 import { state, api, app, esc, fmt, toast, toastError, todayIso, $, $$, confirmDialog, openModal } from '../core.js';
 import { t } from '../i18n.js';
 import { equivalentsLine } from '../co2-equivalents.js';
+import { wxChip } from '../weather.js';
+import { loadStreak, streakLine } from '../streaks.js';
 
-const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent', section: 'fw_reg_section_' };
+const LS = { restaurant: 'fw_reg_restaurant', unit: 'fw_reg_unit', recent: 'fw_reg_recent', section: 'fw_reg_section_', kitchen: 'fw_kitchen_mode' };
+// Quick weight buttons (kg) and the step of the - / + buttons
+const QUICK_KG = [0.1, 0.2, 0.5, 1, 2, 5];
+const STEP_KG = 0.1;
+const kitchenOn = () => { try { return localStorage.getItem(LS.kitchen) === '1'; } catch { return false; } };
 
 // Sections are always asked when a restaurant has them (so you can see which counter the waste comes from).
 // The leaderboard switch only controls the prevention question, the points and the leaderboard page.
@@ -60,10 +66,12 @@ function localInputValue(d) {
 
 export async function renderRegister() {
   s = freshState();
-  app().className = 'app narrow';
+  app().className = `app narrow${kitchenOn() ? ' kitchen' : ''}`;
   if (!state.meta.restaurants.length) { app().innerHTML = `<div class="card empty">${t('no_data')}</div>`; return; }
   app().innerHTML = `
-    <div class="page-head"><h1>${t('reg_title')} <a class="help-q help-q-sm" href="help/staff.html#register" title="${t('help')}" aria-label="${t('help')}">?</a></h1></div>
+    <div class="page-head reg-head"><h1>${t('reg_title')} <a class="help-q help-q-sm" href="help/staff.html#register" title="${t('help')}" aria-label="${t('help')}">?</a></h1>
+      <div class="reg-head-right"><span id="reg-wx"></span><button type="button" class="btn-sm kitchen-toggle" id="kitchen-toggle" aria-pressed="${kitchenOn()}">${kitchenOn() ? t('km_off') : t('km_on')}</button></div>
+      <div class="reg-streak" id="reg-streak"></div></div>
     <form class="reg" id="reg" novalidate>
       <div id="sec-restaurant"></div>
       <section class="step" id="sec-photo"></section>
@@ -75,9 +83,28 @@ export async function renderRegister() {
     </form>
     <section class="card recent" id="sec-today" style="margin-top:18px"></section>`;
   $('#reg').onsubmit = (e) => { e.preventDefault(); save(); };
+  $('#kitchen-toggle').onclick = () => {
+    const on = !kitchenOn();
+    try { localStorage.setItem(LS.kitchen, on ? '1' : '0'); } catch { /* private mode */ }
+    app().classList.toggle('kitchen', on);
+    const b = $('#kitchen-toggle'); b.textContent = on ? t('km_off') : t('km_on'); b.setAttribute('aria-pressed', String(on));
+  };
   renderAll();
   loadToday();
+  loadContext();
   refreshLeaderboardFlag();
+}
+
+// Today's weather and the team's streak for the chosen restaurant (both small, both optional)
+async function loadContext() {
+  const rid = s.restaurantId;
+  const [wx, st] = await Promise.all([
+    api('/weather', { query: { restaurant_id: rid, from: todayIso(), to: todayIso() } }).then((r) => (r.data || [])[0]).catch(() => null),
+    loadStreak(rid),
+  ]);
+  if (rid !== s.restaurantId) return;
+  const w = $('#reg-wx'); if (w) w.innerHTML = wx ? wxChip(wx) : '';
+  const k = $('#reg-streak'); if (k) k.innerHTML = streakLine(st);
 }
 
 function renderAll() {
@@ -98,7 +125,7 @@ function renderRestaurant() {
     s.restaurantId = Number(b.dataset.r);
     s.sectionId = savedSection(s.restaurantId);
     localStorage.setItem(LS.restaurant, String(s.restaurantId));
-    renderRestaurant(); renderMore(); renderWhat(); loadToday(); loadTop(); updateSave();
+    renderRestaurant(); renderMore(); renderWhat(); loadToday(); loadTop(); loadContext(); updateSave();
   }));
   $$('[data-sec]', el).forEach((b) => (b.onclick = () => {
     s.sectionId = Number(b.dataset.sec);
@@ -355,6 +382,11 @@ function renderWeight() {
       <input id="weight" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(s.weight)}" aria-label="${t('reg_weight')}">
       <div class="unit-toggle">${['g', 'kg'].map((u) => `<button type="button" class="${s.unit === u ? 'on' : ''}" data-u="${u}">${u}</button>`).join('')}</div>
     </div>
+    <div class="quick-weights">
+      <button type="button" class="qw-step" data-step="-1" aria-label="${t('qw_less')}">−</button>
+      ${QUICK_KG.map((kg) => `<button type="button" class="qw" data-kg="${kg}">${kg < 1 ? `${kg * 1000} g` : `${kg} kg`}</button>`).join('')}
+      <button type="button" class="qw-step" data-step="1" aria-label="${t('qw_more')}">+</button>
+    </div>
     <div id="weight-note"></div>`;
   renderWeightNote();
   const w = $('#weight');
@@ -366,6 +398,19 @@ function renderWeight() {
     el.classList.toggle('done', Number(s.weight.replace(',', '.')) > 0);
     updateSave();
   };
+  // Quick buttons: set the weight in one tap; - / + change it by 100 g (typed weights stay possible)
+  const setKg = (kg) => {
+    kg = Math.max(0, Math.round(kg * 1000) / 1000);
+    if (s.unit === 'g') s.weight = kg ? String(Math.round(kg * 1000)) : '';
+    else s.weight = kg ? String(kg).replace('.', ',') : '';
+    s.weightSource = 'manual';
+    renderWeight(); updateSave();
+  };
+  $$('[data-kg]', el).forEach((b) => (b.onclick = () => setKg(Number(b.dataset.kg))));
+  $$('[data-step]', el).forEach((b) => (b.onclick = () => {
+    const cur = weightNumber() || 0;
+    setKg((s.unit === 'g' ? cur / 1000 : cur) + Number(b.dataset.step) * STEP_KG);
+  }));
   $$('[data-u]', el).forEach((b) => (b.onclick = () => {
     if (b.dataset.u !== s.unit) s.weightSource = 'manual';
     s.unit = b.dataset.u; localStorage.setItem(LS.unit, s.unit); renderWeight(); updateSave();
@@ -514,7 +559,7 @@ async function save() {
     $('#sec-more').open = false;
     renderAll();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    loadToday(); loadTop(true);
+    loadToday(); loadTop(true); loadContext();
     if (lbOn() && await refreshLeaderboardFlag()) askPrevention(rec);
   } catch (e) {
     s.saving = false; updateSave(); toastError(e);

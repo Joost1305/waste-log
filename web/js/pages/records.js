@@ -4,6 +4,7 @@ import { t } from '../i18n.js';
 import { photoUrl } from '../backend.js';
 import { exportRecords } from '../export.js';
 import { showCo2Info } from '../co2.js';
+import { wxChip } from '../weather.js';
 
 const PAGE = 50;
 let f;
@@ -53,7 +54,7 @@ async function load() {
       </div>
       ${rows.length ? `<div class="table-wrap"><table><thead><tr>
         ${deletable.length ? `<th class="no-print sel-col"><input type="checkbox" id="sel-all" aria-label="${t('select_all')}" title="${t('select_all')}"></th>` : ''}
-        <th>${t('date')}</th><th>${t('product')}</th><th>${t('category')}</th><th>${t('reason')}</th>
+        <th>${t('date')}</th><th class="wx-col">${t('wx_weather')}</th><th>${t('product')}</th><th>${t('category')}</th><th>${t('reason')}</th>
         ${state.meta.restaurants.length > 1 ? `<th>${t('restaurant')}</th>` : ''}<th class="right">${t('weight')}</th><th class="right">${t('value')}</th>
         <th>${t('user')}</th><th class="no-print"></th></tr></thead><tbody>
         ${rows.map((r) => {
@@ -61,6 +62,7 @@ async function load() {
           return `<tr>
           ${deletable.length ? `<td class="no-print sel-col">${editable ? `<input type="checkbox" data-sel="${r.id}" ${selected.has(r.id) ? 'checked' : ''} aria-label="${t('select_all')}">` : ''}</td>` : ''}
           <td class="nowrap">${fmt.dateTime(r.recorded_at)}</td>
+          <td class="wx-col" data-wx="${r.id}"></td>
           <td>${esc(r.product_name || '–')} ${r.has_photo ? `<a href="#" data-photo="${r.id}" title="${t('photo')}">&#128247;</a>` : ''}
             ${r.is_demo ? '<span class="badge demo">DEMO</span>' : ''}</td>
           <td><span class="dot" style="background:${esc(r.category_color || '#999')}"></span>${esc(r.category)}</td>
@@ -76,6 +78,7 @@ async function load() {
           <span class="small muted">${f.offset + 1}–${Math.min(f.offset + PAGE, m.total)} / ${m.total}</span>
           <button class="btn-sm" id="pg-next" ${f.offset + PAGE >= m.total ? 'disabled' : ''}>${t('next')}</button></div>`
       : `<div class="empty">${t('no_data')}</div>`}`;
+    fillWeather(rows);
     const prev = $('#pg-prev'); const next = $('#pg-next');
     if (prev) prev.onclick = () => { f.offset = Math.max(0, f.offset - PAGE); load(); };
     if (next) next.onclick = () => { f.offset += PAGE; load(); };
@@ -118,6 +121,22 @@ async function load() {
       } catch (err) { toastError(err); }
     }));
   } catch (e) { toastError(e); el.innerHTML = ''; }
+}
+
+// Weather of the day per line (stored daily per restaurant); filled in after the table is on screen
+async function fillWeather(rows) {
+  const localDay = (iso) => new Date(iso).toLocaleDateString('sv-SE');
+  const ids = [...new Set(rows.map((r) => r.restaurant_id).filter(Boolean))];
+  if (!ids.length || !rows.length) return;
+  const daysList = rows.map((r) => localDay(r.recorded_at)).sort();
+  let wx;
+  try { wx = (await api('/weather', { query: { restaurant_id: ids.join(','), from: daysList[0], to: daysList[daysList.length - 1] } })).data || []; } catch { return; }
+  const map = new Map(wx.map((w) => [`${w.restaurant_id}|${w.date}`, w]));
+  rows.forEach((r) => {
+    const cell = document.querySelector(`[data-wx="${r.id}"]`);
+    const w = map.get(`${r.restaurant_id}|${localDay(r.recorded_at)}`);
+    if (cell && w) cell.innerHTML = wxChip(w);
+  });
 }
 
 function edit(r) {

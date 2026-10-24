@@ -411,6 +411,23 @@ route('DELETE', '/sections/:id', async ({ p }) => softDelete('sections', p.id));
 route('GET', '/dashboard', async ({ query }) => check(await sb.rpc('dashboard', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null, p_lang: ctx.lang,
 })));
+// One row per day (waste, guests, weather) for the summary line, the daily chart and the weather card
+route('GET', '/dashboard-daily', async ({ query }) => check(await sb.rpc('dashboard_daily', {
+  p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_from: query.from || null, p_to: query.to || null,
+})));
+// Usage per location: last registration and open days missed since
+route('GET', '/usage-health', async () => check(await sb.rpc('usage_health', { p_org: ctx.orgId })));
+// Open days in a row with registrations, per restaurant
+route('GET', '/streak', async ({ query }) => check(await sb.rpc('registration_streak', { p_restaurant: num(query.restaurant_id) })));
+// Stored weather (Open-Meteo, fetched daily) for one or more restaurants
+route('GET', '/weather', async ({ query }) => {
+  const ids = String(query.restaurant_id || '').split(',').map(Number).filter(Boolean);
+  if (!ids.length) return [];
+  let qb = sb.from('weather_records').select('restaurant_id, date, temp_max_c, temp_mean_c, rainfall_mm, condition').in('restaurant_id', ids);
+  if (query.from) qb = qb.gte('date', query.from);
+  if (query.to) qb = qb.lte('date', query.to);
+  return check(await qb.order('date').limit(2000));
+});
 
 // Signed link to a best-practice attachment
 // ------------------------------------------------------------------ invoices

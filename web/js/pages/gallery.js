@@ -16,7 +16,8 @@ export async function renderGallery() {
   app().innerHTML = `
     <div id="gal-print-head"></div>
     <div class="page-head"><div><h1>${t('gal_title')}</h1><div class="muted small">${t('gal_sub')}</div></div>
-      <div class="page-actions no-print"><button type="button" class="btn-sm" id="gal-print">&#128424; ${t('print')}</button></div></div>
+      <div class="page-actions no-print"><button type="button" class="btn-sm btn-primary" id="gal-show">&#9654; ${t('ss_start')}</button>
+        <button type="button" class="btn-sm" id="gal-print">&#128424; ${t('print')}</button></div></div>
     <form class="card filters no-print" id="gal-filters">
       ${meta.restaurants.length > 1 ? `<div><label>${t('restaurant')}</label><select name="restaurant_id"><option value="">${t('all_restaurants')}</option>
         ${meta.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div>` : ''}
@@ -38,6 +39,7 @@ export async function renderGallery() {
   $('#gal-filters').onchange = (e) => { q[e.target.name] = e.target.value; load(true); };
   $('#gal-more').onclick = () => load(false);
   $('#gal-print').onclick = () => printPage();
+  $('#gal-show').onclick = () => slideshow();
   load(true);
 }
 
@@ -136,4 +138,75 @@ function open(r) {
       try { await api(`/waste/${r.id}`, { method: 'DELETE' }); toast(t('deleted_n', { n: 1 })); load(true); } catch (e) { toastError(e); }
     };
   });
+}
+
+// ------------------------------------------------------------------ slideshow
+// Full screen, one photo at a time in the current order and filters; for a screen in the kitchen.
+// Moves on by itself every few seconds; arrows, space and Esc work, and so does tapping the left or right half.
+const SS_MS = 7000; const SS_MAX = 60;
+async function slideshow() {
+  try { while (items.length < Math.min(total, SS_MAX)) { const before = items.length; await load(false); if (items.length === before) break; } } catch { /* show what we have */ }
+  const list = items.filter((r) => r.url);
+  if (!list.length) { toast(t('gal_empty')); return; }
+  let i = 0; let playing = true; let timer = null; let wake = null; let refresh = null;
+  const el = document.createElement('div');
+  el.className = 'slideshow'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', t('ss_start'));
+  el.innerHTML = `<div class="ss-stage"><img alt=""></div>
+    <div class="ss-info"><div class="ss-rank"></div><div class="ss-weight"></div><div class="ss-title"></div><div class="ss-meta"></div><div class="ss-eq"></div></div>
+    <div class="ss-controls">
+      <button type="button" data-ss="prev" aria-label="${t('previous')}">&#9664;</button>
+      <button type="button" data-ss="play"></button>
+      <button type="button" data-ss="next" aria-label="${t('next')}">&#9654;</button>
+      <span class="ss-count"></span>
+      <button type="button" data-ss="close">${t('close')}</button></div>
+    <div class="ss-bar"><span></span></div>`;
+  document.body.appendChild(el);
+  const show = () => {
+    const r = list[i];
+    el.querySelector('img').src = r.url;
+    el.querySelector('.ss-rank').textContent = q.sort === 'heaviest' ? `#${i + 1}` : '';
+    el.querySelector('.ss-weight').innerHTML = `${fmt.kg(r.weight_kg, 1)}${r.weight_source === 'estimate' ? ` <small>${t('badge_estimate')}</small>` : ''}`;
+    el.querySelector('.ss-title').textContent = r.product_name || r.category;
+    el.querySelector('.ss-meta').textContent = [r.category, r.reason, r.restaurant_name, fmt.date(r.recorded_at), fmt.money(r.purchase_value, 2)].filter(Boolean).join(' · ');
+    const eq = equivalentsLine(Number(r.co2e_kg), t, fmt.num, { kitchen: true });
+    el.querySelector('.ss-eq').textContent = eq ? `CO₂ ${eq}` : '';
+    el.querySelector('.ss-count').textContent = `${i + 1} / ${list.length}`;
+    el.querySelector('[data-ss=play]').innerHTML = playing ? `&#10074;&#10074; ${t('ss_pause')}` : `&#9654; ${t('ss_play')}`;
+    const bar = el.querySelector('.ss-bar span');
+    bar.style.transition = 'none'; bar.style.width = '0%';
+    clearTimeout(timer);
+    if (playing) {
+      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${SS_MS}ms linear`; bar.style.width = '100%'; }));
+      timer = setTimeout(() => go(1), SS_MS);
+    }
+    const nxt = list[(i + 1) % list.length]; if (nxt) { const im = new Image(); im.src = nxt.url; }
+  };
+  const go = (n) => { i = (i + n + list.length) % list.length; show(); };
+  const close = () => {
+    clearTimeout(timer); clearInterval(refresh); document.removeEventListener('keydown', onKey);
+    if (wake) wake.release().catch(() => {});
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    el.remove();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight') go(1);
+    else if (e.key === 'ArrowLeft') go(-1);
+    else if (e.key === ' ') { e.preventDefault(); playing = !playing; show(); }
+  };
+  document.addEventListener('keydown', onKey);
+  el.querySelector('.ss-controls').onclick = (e) => {
+    const b = e.target.closest('[data-ss]'); if (!b) return;
+    const a = b.dataset.ss;
+    if (a === 'close') close(); else if (a === 'next') go(1); else if (a === 'prev') go(-1); else { playing = !playing; show(); }
+  };
+  el.querySelector('.ss-stage').onclick = (e) => go(e.clientX < window.innerWidth / 2 ? -1 : 1);
+  // Photo links are valid for an hour: renew them for a screen that keeps running
+  refresh = setInterval(async () => {
+    const urls = await photoUrls(list.map((r) => r.photo_path));
+    list.forEach((r) => { if (urls[r.photo_path]) r.url = urls[r.photo_path]; });
+  }, 45 * 60 * 1000);
+  try { if (el.requestFullscreen) await el.requestFullscreen(); } catch { /* not allowed: the overlay still covers the page */ }
+  try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch { /* screen may dim */ }
+  show();
 }

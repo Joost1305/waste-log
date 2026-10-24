@@ -1,12 +1,15 @@
 // Management dashboard. All numbers come from the dashboard() database function.
 // Chart rules: one measure per chart (no dual axes), single hue for single-series
 // charts, recessive grid, hover tooltips on every chart, tables next to charts.
-import { state, api, app, esc, fmt, toastError, todayIso, addDaysIso, $, $$, printHeader, printPage } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, printHeader, printPage } from '../core.js';
 import { t } from '../i18n.js';
 import { exportDashboard } from '../export.js';
 import { showCo2Info } from '../co2.js';
 import { equivalentsLine } from '../co2-equivalents.js';
 import { showCostInfo } from '../cost.js';
+import { summaryHtml, dailyChart, dailyChartNote, weatherCardHtml, dayLabel } from '../dash-insights.js';
+import { loadStreak, badgesHtml, openCertificate } from '../streaks.js';
+import { openModal } from '../core.js';
 
 const charts = [];
 let q; let last = null;
@@ -50,9 +53,14 @@ export async function renderDashboard() {
 async function load() {
   const body = $('#dash-body');
   try {
-    const d = (await api('/dashboard', { query: { restaurant_id: q.restaurant_id, from: q.from, to: q.to } })).data;
+    const query = { restaurant_id: q.restaurant_id, from: q.from, to: q.to };
+    // The daily series is extra: if it fails, the dashboard still shows everything else
+    const [d, daily] = await Promise.all([
+      api('/dashboard', { query }).then((r) => r.data),
+      api('/dashboard-daily', { query }).then((r) => r.data).catch(() => null),
+    ]);
     last = d;
-    draw(d);
+    draw(d, daily);
   } catch (e) { toastError(e); body.innerHTML = ''; }
 }
 
@@ -94,14 +102,14 @@ function delta(pct, goodWhenDown = true) {
   return `<div class="delta ${good ? 'good' : 'bad'}">${pct > 0 ? '▲' : '▼'} ${fmt.pct(Math.abs(pct), 1)} ${t('vs_prev')}</div>`;
 }
 
-function draw(d) {
+function draw(d, daily) {
   charts.splice(0).forEach((c) => c.destroy());
   const T = d.totals;
   $('#dash-period').textContent = `${fmt.date(d.period.from)} – ${fmt.date(d.period.to)}`;
   const restName = q.restaurant_id ? (state.meta.restaurants.find((r) => r.id === Number(q.restaurant_id)) || {}).name : t('all_restaurants');
   $('#dash-print-head').innerHTML = printHeader(t('dash_title'), `${restName} · ${fmt.date(d.period.from)} – ${fmt.date(d.period.to)}`);
   const body = $('#dash-body');
-  if (!T.records) { body.innerHTML = `<div class="card empty">${t('no_data')}</div>`; return; }
+  if (!T.records) { body.innerHTML = `<div class="card empty">${t('no_data')}</div><div id="dash-health"></div>`; loadHealth(); return; }
 
   const tg = d.target;
   const period = (tg && tg.period) || 'month';
@@ -126,8 +134,9 @@ function draw(d) {
   const trimKg = Number(T.unavoidable_kg) || 0; const trimValue = Number(T.unavoidable_value) || 0;
   const co2Eq = equivalentsLine(Number(T.co2e_kg), t, fmt.num, { kitchen: true, max: 2 });
   body.innerHTML = `
+    ${daily ? summaryHtml(d, daily) : ''}
     <div class="grid grid-kpi">
-      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted">${fmt.kg(T.kg_per_day, 1)} ${t('per_day')}</div>
+      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted" title="${t('per_reg_day_hint')}">${fmt.kg(T.kg_per_day, 1)} ${t('per_reg_day')}</div>
         ${trimKg > 0 ? `<div class="delta muted">${t('trim_of', { kg: fmt.kg(trimKg, 1) })}</div>` : ''}</div>
       <button type="button" class="card kpi kpi-link" id="kpi-cost" title="${t('cost_hint')}"><div class="label">${t('kpi_cost')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${fmt.money(T.value - trimValue)}</div>
@@ -140,6 +149,8 @@ function draw(d) {
         <div class="delta muted link-ish">${t('co2_short')}</div></button>
     </div>
     <div style="margin-top:16px">${targetHtml}</div>
+    ${daily ? `<div class="card" style="margin-top:16px"><h2>${t('dc_title')}</h2><div class="chart-box tall"><canvas id="c-daily"></canvas></div>
+      ${dailyChartNote(daily) ? `<div class="note">${dailyChartNote(daily)}</div>` : ''}</div>` : ''}
     <div id="dash-sales"></div>
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card"><h2>${t('trend')} (kg)</h2><div class="chart-box"><canvas id="c-trend"></canvas></div></div>
@@ -152,6 +163,9 @@ function draw(d) {
       d.by_restaurant.map((r) => [esc(r.name), fmt.kg(r.kg, 0), fmt.money(r.value), fmt.num(r.guests), r.g_per_guest != null ? `${fmt.num(r.g_per_guest)} g` : '–']),
       [false, true, true, true, true])}</div>` : ''}
     ${sectionCard(d.by_section || [])}
+    ${daily ? `<div style="margin-top:16px">${weatherCardHtml(daily)}</div>` : ''}
+    <div id="dash-streaks"></div>
+    <div id="dash-health"></div>
     <div class="grid grid-2" style="margin-top:16px">
       <div class="card"><h2>${t('by_supplier')}</h2>${table(
         [t('reg_supplier'), t('wasted'), t('purchased'), t('waste_rate')],
@@ -172,7 +186,7 @@ function draw(d) {
       <div class="note">${t('rate_note')}</div>
     </div>`;
 
-  loadSales();
+  loadSales(); loadStreaks(); loadHealth();
   $('#kpi-co2').onclick = () => showCo2Info(null, null, Number(T.co2e_kg));
   $('#kpi-cost').onclick = () => showCostInfo(d.valuation_mix, T.value, state.meta.organization.default_value_per_kg);
 
@@ -213,6 +227,7 @@ function draw(d) {
         label: (c) => { const r = rows[c.dataIndex]; return `${fmt.kg(r.kg, 1)} · ${r.avoidable === false ? t('trim_no_cost') : fmt.money(r.value)} · ${fmt.pct((r.kg / T.kg) * 100)}`; } } } } },
   });
   charts.push(hbar($('#c-cat'), d.by_category));
+  if (daily && $('#c-daily')) { const c = dailyChart($('#c-daily'), d, daily, css); if (c) charts.push(c); }
   charts.push(hbar($('#c-reason'), d.by_reason));
 }
 
@@ -238,4 +253,63 @@ function sectionCard(rows) {
     [t('lb_section'), 'kg', t('ds_share'), t('value')],
     rows.map((r) => [name(r), `<span class="nowrap">${fmt.kg(r.kg, 1)}</span>`, share(r), `<span class="nowrap">${fmt.money(r.value)}</span>`]),
     [false, true, true, true])}</div>`;
+}
+
+// ------------------------------------------------------------------ streaks (badges and certificates)
+async function loadStreaks() {
+  const box = $('#dash-streaks');
+  if (!box) return;
+  const ids = q.restaurant_id ? [Number(q.restaurant_id)] : state.meta.restaurants.map((r) => r.id);
+  const list = (await Promise.all(ids.slice(0, 12).map(loadStreak))).filter((s) => s && (s.best > 0 || s.current > 0));
+  if (!list.length || !$('#dash-streaks')) return;
+  box.innerHTML = `<div class="card" style="margin-top:16px"><h2>${t('st_title')}</h2>
+    <p class="small muted" style="margin-top:-6px">${t('st_sub')}</p>${list.map(badgesHtml).join('')}</div>`;
+  box.querySelectorAll('[data-cert]').forEach((b) => (b.onclick = () => {
+    const [rid, level] = b.dataset.cert.split(':').map(Number);
+    const s = list.find((x) => x.restaurant_id === rid);
+    if (!openCertificate(s, level, state.meta.organization && state.meta.organization.name)) toastError(new Error(t('st_popup')));
+  }));
+}
+
+// ------------------------------------------------------------------ usage per location
+async function loadHealth() {
+  const box = $('#dash-health');
+  if (!box) return;
+  let h;
+  try { h = (await api('/usage-health')).data; } catch { return; }
+  const rows = (h && h.rows) || [];
+  if (!rows.length || !$('#dash-health')) return;
+  const statusOf = (missed, last) => (last == null || missed >= 14 ? 'inactive' : missed >= 4 ? 'slipping' : 'active');
+  const pill = (st) => `<span class="health-pill ${st}">${t('uh_' + st)}</span>`;
+  const lastTxt = (last, missed) => (last == null ? t('uh_never')
+    : `${dayLabel(last)}${missed > 0 ? ` · ${t('uh_missed', { n: missed })}` : ''}`);
+  const count = (st) => rows.filter((r) => r.status === st).length;
+  box.innerHTML = `<div class="card" style="margin-top:16px"><h2>${t('uh_title')}</h2>
+    <p class="small muted" style="margin-top:-6px">${t('uh_sub')}</p>
+    <div class="health-sum">${['active', 'slipping', 'inactive'].map((st) => `<div class="health-box ${st}"><strong>${count(st)}</strong> ${t('uh_' + st)}</div>`).join('')}</div>
+    <div class="table-wrap"><table><thead><tr><th>${t('restaurant')}</th><th>${t('uh_status')}</th><th>${t('uh_last')}</th>
+      <th class="right">${t('uh_days30')}</th><th class="no-print"></th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td><strong>${esc(r.name)}</strong></td><td>${pill(r.status)}</td><td class="small">${lastTxt(r.last, r.missed)}</td>
+        <td class="right num">${r.days_30} / ${r.open_30}</td>
+        <td class="right no-print">${r.status !== 'active' ? `<button type="button" class="btn-sm" data-remind="${r.restaurant_id}">${t('uh_remind')}</button>` : ''}</td></tr>
+        ${(r.sections || []).map((x) => { const st = statusOf(x.missed, x.last); return `<tr class="health-sec"><td class="small">↳ ${esc(x.name)}</td><td>${pill(st)}</td>
+          <td class="small">${lastTxt(x.last, x.missed)}</td><td></td>
+          <td class="right no-print">${st !== 'active' ? `<button type="button" class="btn-sm btn-ghost" data-remind="${r.restaurant_id}" data-sec="${esc(x.name)}">${t('uh_remind')}</button>` : ''}</td></tr>`; }).join('')}`).join('')}
+    </tbody></table></div>
+    <div class="note">${t('uh_note')}</div></div>`;
+  box.querySelectorAll('[data-remind]').forEach((b) => (b.onclick = () => {
+    const r = rows.find((x) => x.restaurant_id === Number(b.dataset.remind));
+    const where = b.dataset.sec ? `${r.name} · ${b.dataset.sec}` : r.name;
+    const msg = t('uh_msg', { where, url: location.origin + location.pathname });
+    openModal(`<h2>${t('uh_remind_title', { where: esc(where) })}</h2>
+      <p class="small muted">${t('uh_remind_sub')}</p>
+      <textarea id="uh-msg" rows="5" style="width:100%">${esc(msg)}</textarea>
+      <div class="modal-actions"><button type="button" data-close>${t('close')}</button><button type="button" class="btn-primary" id="uh-copy">${t('uh_copy')}</button></div>`,
+    (card) => {
+      card.querySelector('#uh-copy').onclick = async () => {
+        const ta = card.querySelector('#uh-msg');
+        try { await navigator.clipboard.writeText(ta.value); toast(t('uh_copied')); } catch { ta.select(); document.execCommand('copy'); toast(t('uh_copied')); }
+      };
+    });
+  }));
 }
