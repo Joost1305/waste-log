@@ -35,7 +35,16 @@ export async function renderLeaderboard(rest = []) {
     app().className = 'app lb-screen';
     timer = setInterval(() => { if (location.hash.startsWith('#/leaderboard/screen')) load(true); else clearInterval(timer); }, 5 * 60 * 1000);
   }
-  app().innerHTML = `<div id="lb"><div class="card empty"><span class="spinner"></span></div></div>`;
+  // On the kitchen screen the app menu is hidden, so the way back must always be there and easy to hit,
+  // also while loading or when the leaderboard cannot be loaded.
+  app().innerHTML = `${screen ? `<a class="lb-screen-close" href="#/leaderboard" aria-label="${t('lb_screen_exit')}">&#10005; <span>${t('lb_screen_exit')}</span></a>` : ''}
+    <div id="lb"><div class="card empty"><span class="spinner"></span></div></div>`;
+  if (screen) {
+    const onKey = (e) => { if (e.key === 'Escape') location.hash = '#/leaderboard'; };
+    const off = () => { if (!location.hash.startsWith('#/leaderboard/screen')) { document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', off); } };
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('hashchange', off);
+  }
   await load(screen);
 }
 
@@ -173,5 +182,5 @@ function drawScreen() {
     <ol class="lb-screen-list">${rows.map((r, i) => `<li><span class="lb-rank">${medal(i)}</span><span class="lb-sname">${esc(r.name)}</span>
       <span class="lb-sbar"><span style="width:${(r.points / max) * 100}%"></span></span><span class="lb-spts">${fmt.num(r.points)}</span></li>`).join('')}</ol>
     ${d.idea_of_period ? `<div class="lb-screen-idea">&#128161; ${t('lb_idea_of')}: “${esc(d.idea_of_period.text)}” <span>· ${esc(d.idea_of_period.section || '')}</span></div>` : ''}
-    <div class="lb-screen-foot">${t('lb_screen_foot')} · <a href="#/leaderboard">${t('lb_screen_exit')}</a></div>`;
+    <div class="lb-screen-foot">${t('lb_screen_foot')}</div>`;
 }
