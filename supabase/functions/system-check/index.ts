@@ -148,6 +148,18 @@ Deno.serve(async (req) => {
     return { status: h < 2 ? 'ok' : h < 6 ? 'warn' : 'fail', detail: h < 2 ? when : `${when}: the hourly job (weather, weekly e-mails) is not running` };
   }));
 
+  // 9. Table access: every table has RLS on, grants for logged-in users and service_role, none for anon.
+  // From 30 Oct 2026 Supabase no longer grants new tables automatically, so a forgotten grant shows up here.
+  checks.push(await timed('table_access', async () => {
+    if (!inputs) return { status: 'warn', detail: 'not checked (database not reachable)' };
+    const issues = (inputs.table_access || []) as { table: string; problem: string }[];
+    if (!issues.length) return { status: 'ok', detail: 'all tables protected and reachable for logged-in users' };
+    const list = issues.slice(0, 6).map((i) => `${i.table}: ${i.problem}`).join('; ');
+    const more = issues.length > 6 ? ` (+${issues.length - 6} more)` : '';
+    const blocked = issues.some((i) => i.problem.startsWith('no access') || i.problem === 'open to anon (not logged in)' || i.problem === 'RLS off');
+    return { status: blocked ? 'fail' : 'warn', detail: `${list}${more}` };
+  }));
+
   const status: Status = checks.some((c) => c.status === 'fail') ? 'fail' : checks.some((c) => c.status === 'warn') || (inputs?.gaps || []).length ? 'warn' : 'ok';
   const row = {
     trigger, status, checks,
