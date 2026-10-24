@@ -7,7 +7,7 @@ import { exportDashboard } from '../export.js';
 import { showCo2Info } from '../co2.js';
 import { equivalentsLine } from '../co2-equivalents.js';
 import { showCostInfo } from '../cost.js';
-import { summaryHtml, dailyChart, dailyChartNote, weatherCardHtml, dayLabel } from '../dash-insights.js';
+import { summaryHtml, dailyChart, dailyChartNote, weatherCardHtml, dayLabel, kgPerOpenDay } from '../dash-insights.js';
 import { loadStreak, badgesHtml, openCertificate } from '../streaks.js';
 import { openModal } from '../core.js';
 
@@ -136,7 +136,7 @@ function draw(d, daily) {
   body.innerHTML = `
     ${daily ? summaryHtml(d, daily) : ''}
     <div class="grid grid-kpi">
-      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted" title="${t('per_reg_day_hint')}">${fmt.kg(T.kg_per_day, 1)} ${t('per_reg_day')}</div>
+      <div class="card kpi"><div class="label">${t('kpi_total')}</div><div class="value">${fmt.kg(T.kg, 0)}</div>${delta(T.change_kg_pct)}<div class="delta muted" title="${t('per_reg_day_hint')}">${fmt.kg((daily && kgPerOpenDay(daily)) ?? T.kg_per_day, 1)} ${t('per_reg_day')}</div>
         ${trimKg > 0 ? `<div class="delta muted">${t('trim_of', { kg: fmt.kg(trimKg, 1) })}</div>` : ''}</div>
       <button type="button" class="card kpi kpi-link" id="kpi-cost" title="${t('cost_hint')}"><div class="label">${t('kpi_cost')} <span class="info-i" aria-hidden="true">i</span></div>
         <div class="value">${fmt.money(T.value - trimValue)}</div>

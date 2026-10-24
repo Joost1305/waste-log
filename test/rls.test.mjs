@@ -763,7 +763,7 @@ test('missing days: kg per day only counts registered days; daily series, streak
   const d = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
   if (Number(d.totals.kg) > 0) {
     assert.ok(d.totals.registered_days >= 1);
-    assert.equal(Number(d.totals.kg_per_day), Math.round((Number(d.totals.kg) / d.totals.registered_days) * 100) / 100);
+    assert.ok(Number(d.totals.kg_per_day) > 0);
   }
   const daily = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select dashboard_daily(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
   assert.ok(daily.days.length >= 365);
@@ -788,4 +788,34 @@ test('missing days: kg per day only counts registered days; daily series, streak
   assert.equal(ams.missed, 0);
   assert.ok(!h.rows.some((r) => r.restaurant_id === ID.bistroRest));
   await assert.rejects(as(db, U['student@hth'], ({ one }) => one(`select usage_health(null)`)));
+});
+
+test('closed days: waste logged on a closed day is in the total, not in kg per registered day', async () => {
+  const one = async (sql, p) => (await db.query(sql, p)).rows[0];
+  const old = (await one('select open_days from restaurants where id = $1', [ID.ams])).open_days;
+  await db.query(`update restaurants set open_days = '{1,2,3,4,5}' where id = $1`, [ID.ams]);
+  try {
+    // the most recent Saturday at least a week ago, inside a 4-week window
+    const sat = (await one(`select (current_date - 7 - ((extract(isodow from current_date)::int + 1) % 7))::date d`)).d;
+    const rec = await as(db, U['manager.amsterdam@hth'], ({ one: o }) => o(...insertWaste({ restaurant_id: ID.ams, product_id: ID.tomato, reason_id: ID.spoilage, weight_kg: 0.15 })));
+    await db.query(`update waste_records set recorded_at = ($2::date + time '12:00') at time zone 'Europe/Amsterdam' where id = $1`, [rec.id, sat]);
+    const d = await as(db, U['orgadmin@hth'], async ({ one: o }) => (await o(`select dashboard(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
+    const exp = await one(`select coalesce(sum(weight_kg), 0) kg, count(distinct (recorded_at at time zone 'Europe/Amsterdam')::date)::int n
+        from waste_records where restaurant_id = $1 and deleted_at is null
+         and (recorded_at at time zone 'Europe/Amsterdam')::date between current_date - 27 and current_date
+         and extract(isodow from (recorded_at at time zone 'Europe/Amsterdam')::date) between 1 and 5`, [ID.ams]);
+    assert.equal(d.totals.registered_days, exp.n);
+    assert.equal(Number(d.totals.kg_per_day), Number((await one('select round($1::numeric / greatest(1, $2::int), 2) v', [exp.kg, exp.n])).v));
+    // the Saturday's kilos are still in the total
+    const all = await one(`select coalesce(sum(weight_kg), 0) kg from waste_records where restaurant_id = $1 and deleted_at is null
+         and (recorded_at at time zone 'Europe/Amsterdam')::date between current_date - 27 and current_date`, [ID.ams]);
+    assert.ok(Number(all.kg) - Number(exp.kg) >= 0.15 - 1e-9);
+    // the daily series marks the Saturday as closed, so the page leaves it out of averages and the best day
+    const daily = await as(db, U['orgadmin@hth'], async ({ one: o }) => (await o(`select dashboard_daily(null, $1, current_date - 27, current_date) d`, [ID.ams])).d);
+    const satRow = daily.days.find((x) => x.d === sat.toISOString().slice(0, 10));
+    assert.equal(satRow.open, false);
+    assert.ok(satRow.n >= 1);
+  } finally {
+    await db.query('update restaurants set open_days = $2 where id = $1', [ID.ams, old]);
+  }
 });

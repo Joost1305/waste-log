@@ -3,6 +3,8 @@
 //  - the daily chart with reference lines (same day last week, 4-week average, baseline) and rain days shaded
 //  - the "Weather and waste" card
 // Rule throughout: an open day without registrations is "no data", never zero waste. It is left out of every average.
+// Closed days (restaurants.open_days) never count in an average or as the best day, even when someone logged a little:
+// that waste stays in the totals, but a closed day is not a normal working day to compare with.
 import { esc, fmt, addDaysIso } from './core.js';
 import { t, lang } from './i18n.js';
 import { wxIcon, wxText, RAIN_MM } from './weather.js';
@@ -20,7 +22,7 @@ function periodDays(daily) {
   const first = (daily.days.find((x) => x.n > 0) || {}).d || daily.today;
   const all = daily.days.filter((x) => x.d >= daily.from && x.d <= daily.to && x.d >= first);
   const done = all.filter((x) => x.d < daily.today);
-  return { all, done, reg: done.filter((x) => x.n > 0), missing: done.filter((x) => x.open && x.n === 0) };
+  return { all, done, reg: done.filter((x) => x.open && x.n > 0), missing: done.filter((x) => x.open && x.n === 0) };
 }
 
 // Baseline per open day, from the target's baseline per week / month / year
@@ -30,6 +32,12 @@ function baselinePerDay(d, daily) {
   const pdays = { week: 7, month: 30, year: 365 }[tg.period] || 30;
   const openShare = (daily.open_dows || []).length / 7 || 1;
   return Number(tg.baseline_kg) / (pdays * openShare);
+}
+
+// kg per registered open day for the selected period: the same number the summary line uses
+export function kgPerOpenDay(daily) {
+  const { reg } = periodDays(daily);
+  return reg.length ? mean(reg.map((x) => Number(x.kg))) : null;
 }
 
 // ------------------------------------------------------------------ summary line
@@ -49,7 +57,7 @@ export function summaryHtml(d, daily) {
   } else {
     const span = daysBetween(daily.from, daily.to);
     const pFrom = addDaysIso(daily.from, -span); const pTo = addDaysIso(daily.from, -1);
-    const prev = daily.days.filter((x) => x.d >= pFrom && x.d <= pTo && x.n > 0);
+    const prev = daily.days.filter((x) => x.d >= pFrom && x.d <= pTo && x.open && x.n > 0);
     if (prev.length >= 3) {
       const diff = (avg / mean(prev.map((x) => Number(x.kg))) - 1) * 100;
       parts.push(Math.abs(diff) < 3 ? t('sum_same_prev', { kg: fmt.kg(avg, 1) })
@@ -92,7 +100,7 @@ export function dailyChart(canvas, d, daily, css) {
   const lastWeek = days.map((x) => val(byDate.get(addDaysIso(x.d, -7))));
   const avg4 = days.map((x) => {
     const from = addDaysIso(x.d, -27);
-    const vals = daily.days.filter((y) => y.d >= from && y.d <= x.d && y.n > 0 && y.d < daily.today).map((y) => Number(y.kg));
+    const vals = daily.days.filter((y) => y.d >= from && y.d <= x.d && y.open && y.n > 0 && y.d < daily.today).map((y) => Number(y.kg));
     return vals.length >= 5 ? Math.round(mean(vals) * 100) / 100 : null;
   });
   const base = baselinePerDay(d, daily);
@@ -164,7 +172,7 @@ export function weatherCardHtml(daily) {
     return `<div class="card">${head}<p class="muted small">${t('wx_none')}</p></div>`;
   }
   // Finished, registered days with weather; avoidable waste only (trim does not depend on the weather)
-  const usable = daily.days.filter((x) => x.n > 0 && x.d < daily.today && (x.tmax != null || x.rain != null));
+  const usable = daily.days.filter((x) => x.open && x.n > 0 && x.d < daily.today && (x.tmax != null || x.rain != null));
   const withGuests = usable.filter((x) => x.guests > 0);
   const perGuest = withGuests.length >= 10 && withGuests.length >= usable.length * 0.7;
   const pool = perGuest ? withGuests : usable;
