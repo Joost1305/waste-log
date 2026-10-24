@@ -297,7 +297,7 @@ function editBestPractice(bp, fromIntervention = false) {
       options: restOpts },
     { name: 'category_id', label: t('bp_f_category'), type: 'select', options: (bps.categories || []).map((c) => ({ value: c.id, label: c.label })) },
     { name: 'problem', label: t('bp_problem'), type: 'textarea' },
-    { name: 'solution', label: t('bp_solution'), type: 'textarea' },
+    { name: 'solution', label: t('bp_f_solution'), type: 'textarea' },
     { name: 'result', label: t('bp_result'), type: 'textarea' },
     { name: 'result_change_pct', label: t('bp_f_pct'), type: 'number', step: '0.1' },
     ...(ivs.length ? [{ name: 'intervention_id', label: t('bp_from_iv'), type: 'select',
