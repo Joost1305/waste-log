@@ -5,6 +5,7 @@ import { t } from '../i18n.js';
 import { photoUrls } from '../backend.js';
 import { showCo2Info } from '../co2.js';
 import { equivalentsLine } from '../co2-equivalents.js';
+import { openPoster } from '../poster.js';
 
 const PAGE = 24;
 const SORTS = ['heaviest', 'lightest', 'category', 'newest'];
@@ -17,6 +18,7 @@ export async function renderGallery() {
     <div id="gal-print-head"></div>
     <div class="page-head"><div><h1>${t('gal_title')}</h1><div class="muted small">${t('gal_sub')}</div></div>
       <div class="page-actions no-print"><button type="button" class="btn-sm btn-primary" id="gal-show">&#9654; ${t('ss_start')}</button>
+        ${meta.permissions.dashboard ? `<button type="button" class="btn-sm" id="gal-poster">&#128444; ${t('pst_button')}</button>` : ''}
         <button type="button" class="btn-sm" id="gal-print">&#128424; ${t('print')}</button></div></div>
     <form class="card filters no-print" id="gal-filters">
       ${meta.restaurants.length > 1 ? `<div><label>${t('restaurant')}</label><select name="restaurant_id"><option value="">${t('all_restaurants')}</option>
@@ -40,6 +42,7 @@ export async function renderGallery() {
   $('#gal-more').onclick = () => load(false);
   $('#gal-print').onclick = () => printPage();
   $('#gal-show').onclick = () => slideshow();
+  if ($('#gal-poster')) $('#gal-poster').onclick = () => openPoster(q.restaurant_id);
   load(true);
 }
 

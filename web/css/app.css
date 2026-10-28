@@ -605,3 +605,58 @@ tr.sc-current td { background: var(--surface-2); }
 .ss-controls button:hover { background: rgba(255,255,255,.2); }
 .ss-count { color: rgba(255,255,255,.7); font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
 @media print { .slideshow { display: none; } }
+
+/* ------------------------------------------------ impact poster (gallery) */
+.poster { position: fixed; inset: 0; z-index: 100; background: #E9E6DE; overflow: auto; }
+.pst-bar-top { position: sticky; top: 0; display: flex; gap: 8px; justify-content: center; align-items: center; padding: 10px; background: rgba(233,230,222,.95); z-index: 1; }
+.pst-bar-top select { width: auto; }
+.pst-wrap { padding: 8px 16px 32px; }
+.pst-page { --pk: #1F3B33; --pa: #2F7A5F; --pw: #E7A57B; width: min(100%, 794px); aspect-ratio: 210 / 297; margin: 0 auto; background: #FBFAF6; color: var(--pk);
+  box-shadow: 0 6px 30px rgba(0,0,0,.12); padding: 5.5% 6%; display: flex; flex-direction: column; gap: 2.2%; font-size: clamp(9px, 1.9vw, 15px); overflow: hidden; }
+.pst-empty { margin: auto; color: #6b746f; font-size: 1.3em; }
+.pst-demo { background: #F4D35E; color: #3a2f00; text-align: center; font-weight: 700; padding: 4px; border-radius: 6px; }
+.pst-kicker { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; font-size: .85em; color: var(--pa); }
+.pst-head h1 { font-size: 2.6em; line-height: 1.05; margin: .15em 0 0; color: var(--pk); }
+.pst-top { display: grid; grid-template-columns: 1.1fr 1fr; gap: 4%; align-items: center; }
+.pst-good { font-size: 4.2em; font-weight: 800; line-height: 1; color: var(--pa); font-variant-numeric: tabular-nums; }
+.pst-good.pst-neutral { color: var(--pk); }
+.pst-good-sub { font-size: 1.05em; margin-top: .3em; }
+.pst-figs { display: grid; gap: .6em; }
+.pst-figs strong { display: block; font-size: 1.9em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.pst-figs span { font-size: .9em; color: #55625c; }
+.pst-eq { font-size: .9em; color: var(--pa); }
+.pst-hero { position: relative; flex: 1 1 auto; min-height: 30%; border-radius: 14px; overflow: hidden; background: #1a2420; }
+.pst-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pst-hero-txt { position: absolute; left: 0; right: 0; bottom: 0; padding: 4% 5%; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+.pst-hero-kg { font-size: 2.6em; font-weight: 800; line-height: 1; }
+.pst-hero-name { font-size: 1.25em; font-weight: 700; }
+.pst-q { margin-top: .35em; font-size: 1.1em; color: #FFE1CC; }
+.pst-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5%; }
+.pst-cols h2, .pst-label { font-size: .85em; text-transform: uppercase; letter-spacing: .1em; color: var(--pa); margin: 0 0 .6em; font-weight: 800; }
+.pst-top3 { list-style: none; margin: 0; padding: 0; display: grid; gap: .55em; }
+.pst-top3 li { display: flex; gap: .7em; align-items: center; }
+.pst-top3 img, .pst-noimg { width: 3.4em; height: 3.4em; border-radius: 8px; object-fit: cover; flex: none; background: #DCE6E1; }
+.pst-top3 strong { display: block; }
+.pst-top3 span, .pst-muted { color: #55625c; font-size: .9em; }
+.pst-reason, .pst-target { margin-bottom: .65em; }
+.pst-reason-l { display: flex; justify-content: space-between; gap: 8px; font-size: .95em; }
+.pst-bar { height: .55em; border-radius: 99px; background: #E3E8E5; margin-top: .25em; overflow: hidden; }
+.pst-bar span { display: block; height: 100%; background: var(--pa); border-radius: 99px; }
+.pst-bar-t span { background: var(--pw); }
+.pst-target { margin-top: 1em; }
+.pst-action { background: #E4F0EA; border-radius: 12px; padding: 3% 4%; }
+.pst-action .pst-label { margin-bottom: .3em; }
+.pst-action-txt { font-size: 1.3em; font-weight: 700; }
+.pst-ideas { border: 2px dashed #B9C6BF; border-radius: 12px; padding: 3% 4%; }
+.pst-lines { height: 3.6em; background: repeating-linear-gradient(transparent 0 1.75em, #CBD5D0 1.75em calc(1.75em + 1px)); }
+.pst-foot { margin-top: auto; font-size: .78em; color: #6b746f; display: grid; gap: .2em; border-top: 1px solid #DDE3DF; padding-top: .7em; }
+@page poster { size: A4 portrait; margin: 0; }
+@media print {
+  body.poster-on > *:not(.poster) { display: none !important; }
+  body.poster-on { background: #fff; }
+  .poster { position: static; background: #fff; overflow: visible; }
+  .pst-wrap { padding: 0; }
+  .pst-page { page: poster; width: 210mm; height: 297mm; aspect-ratio: auto; box-shadow: none; font-size: 10.5pt; margin: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pst-hero { min-height: 78mm; }
+}

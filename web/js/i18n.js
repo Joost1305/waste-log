@@ -280,6 +280,12 @@ const dict = {
     // kitchen mode, quick weights, slideshow
     km_on: 'Kitchen mode', km_off: 'Normal view', qw_less: '100 g less', qw_more: '100 g more',
     ss_start: 'Slideshow', ss_pause: 'Pause', ss_play: 'Play',
+    pst_button: 'Impact poster', pst_title: 'Our food waste in {m}', pst_this: 'This month', pst_last: 'Last month',
+    pst_less: 'less waste per day than the period before. Well done, team.', pst_regs_thanks: 'registrations on {d} days. That is how we learn where it goes.',
+    pst_avoidable: 'food we could have saved', pst_value: 'purchase value', pst_question: 'Our heaviest bin. How do we make this smaller together?',
+    pst_top3: 'What we throw away most', pst_why: 'Why it happens', pst_action: 'What we are trying now', pst_ideas: 'Your idea for next month',
+    pst_thanks: '{n} registrations, thank you.', pst_honest: 'More logging gives a truer picture, not a worse kitchen.',
+    pst_days: '{r} of {o} open days registered', pst_empty: 'No registrations yet for {m}.',
   },
   nl: {
     ds_no_sales: 'Upload verkooprapporten uit de kassa om waste te zien als percentage van de omzet en per verkocht gerecht:', ds_sales_title: 'Waste en verkoop',
@@ -555,6 +561,12 @@ const dict = {
     uh_copy: 'Bericht kopiëren', uh_copied: 'Bericht gekopieerd',
     km_on: 'Keukenmodus', km_off: 'Normale weergave', qw_less: '100 g minder', qw_more: '100 g meer',
     ss_start: 'Diavoorstelling', ss_pause: 'Pauze', ss_play: 'Afspelen',
+    pst_button: 'Impactposter', pst_title: 'Onze verspilling in {m}', pst_this: 'Deze maand', pst_last: 'Vorige maand',
+    pst_less: 'minder verspilling per dag dan de periode ervoor. Goed bezig, team.', pst_regs_thanks: 'registraties op {d} dagen. Zo leren we waar het naartoe gaat.',
+    pst_avoidable: 'eten dat we hadden kunnen redden', pst_value: 'inkoopwaarde', pst_question: 'Onze zwaarste bak. Hoe maken we die samen kleiner?',
+    pst_top3: 'Wat we het meest weggooien', pst_why: 'Waarom het gebeurt', pst_action: 'Wat we nu proberen', pst_ideas: 'Jouw idee voor volgende maand',
+    pst_thanks: '{n} registraties, dank je wel.', pst_honest: 'Meer registreren geeft een eerlijker beeld, geen slechtere keuken.',
+    pst_days: '{r} van {o} open dagen geregistreerd', pst_empty: 'Nog geen registraties in {m}.',
   },
 };
 
