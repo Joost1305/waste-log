@@ -158,8 +158,7 @@ async function slideshow() {
       <button type="button" data-ss="play"></button>
       <button type="button" data-ss="next" aria-label="${t('next')}">&#9654;</button>
       <span class="ss-count"></span>
-      <button type="button" data-ss="close">${t('close')}</button></div>
-    <div class="ss-bar"><span></span></div>`;
+      <button type="button" data-ss="close">${t('close')}</button></div>`;
   document.body.appendChild(el);
   const show = () => {
     const r = list[i];
@@ -172,13 +171,8 @@ async function slideshow() {
     el.querySelector('.ss-eq').textContent = eq ? `CO₂ ${eq}` : '';
     el.querySelector('.ss-count').textContent = `${i + 1} / ${list.length}`;
     el.querySelector('[data-ss=play]').innerHTML = playing ? `&#10074;&#10074; ${t('ss_pause')}` : `&#9654; ${t('ss_play')}`;
-    const bar = el.querySelector('.ss-bar span');
-    bar.style.transition = 'none'; bar.style.width = '0%';
     clearTimeout(timer);
-    if (playing) {
-      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${SS_MS}ms linear`; bar.style.width = '100%'; }));
-      timer = setTimeout(() => go(1), SS_MS);
-    }
+    if (playing) timer = setTimeout(() => go(1), SS_MS);
     const nxt = list[(i + 1) % list.length]; if (nxt) { const im = new Image(); im.src = nxt.url; }
   };
   const go = (n) => { i = (i + n + list.length) % list.length; show(); };

@@ -590,7 +590,7 @@ tr.sc-current td { background: var(--surface-2); }
 .app.kitchen #what-search { font-size: 1.15rem; padding: 14px 16px; }
 
 /* ------------------------------------------------ gallery slideshow */
-.slideshow { position: fixed; inset: 0; z-index: 100; background: #0E1412; color: #fff; display: grid; grid-template-rows: 1fr auto auto auto; }
+.slideshow { position: fixed; inset: 0; z-index: 100; background: #0E1412; color: #fff; display: grid; grid-template-rows: 1fr auto auto; }
 .ss-stage { min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px; cursor: pointer; }
 .ss-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; }
 .ss-info { text-align: center; padding: 6px 20px 4px; }
@@ -604,6 +604,4 @@ tr.sc-current td { background: var(--surface-2); }
 .ss-controls button { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.2); }
 .ss-controls button:hover { background: rgba(255,255,255,.2); }
 .ss-count { color: rgba(255,255,255,.7); font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
-.ss-bar { height: 4px; background: rgba(255,255,255,.12); }
-.ss-bar span { display: block; height: 100%; width: 0; background: #E7A57B; }
 @media print { .slideshow { display: none; } }
