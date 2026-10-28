@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 28 October 2026, after migration 0042. Source of truth is the code in the
+Updated 28 October 2026, after migration 0043. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -16,7 +16,7 @@ Supabase project "waste-log" (eu-central-1)
  ├─ Auth            logins, invitations, password links
  ├─ Postgres        all data, Row Level Security, business logic as SQL functions and triggers
  ├─ Storage         private buckets: waste photos and invoices, one folder per organization
- └─ Edge Functions  admin-users · identify-food · read-invoice · daily · weekly-report · system-check
+ └─ Edge Functions  admin-users · identify-food · read-invoice · suggest-ideas · daily · weekly-report · system-check
 
 GitHub Actions
  ├─ pages.yml         deploy web/ on every push to main
@@ -72,7 +72,7 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0042). Groups:
+Schema in `supabase/migrations/` (0001 to 0043). Groups:
 
 - **Tenancy:** organizations, restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
@@ -125,7 +125,7 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 | Recognise food and estimate or read weight from a photo | `identify-food` | Live with `ANTHROPIC_API_KEY` |
 | Read supplier invoices (PDF, photo, Excel/CSV) | `read-invoice` | Live with key; manager checks every line |
 | Suggested interventions from rules | `intervention_suggestions` (SQL, 0042) | Live, no AI |
-| AI write-up of suggestions | | Not built |
+| AI ideas for a suggestion | `suggest-ideas` | Live with key; numbers recomputed server-side, ideas with invented figures dropped |
 
 - Without a key the functions answer `{ available: false }` and the app continues manually.
 - Output is validated and mapped onto the organization's own categories and products; unknown output is discarded.
@@ -142,7 +142,7 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 |---|---|---|
 | 1 | Auth, organizations, restaurants, users, waste registration, dashboard, targets | Done |
 | 2 | AI photo recognition, invoice upload and reading, CO₂ per product, sales reports | Done (sales optional per organization) |
-| 3 | Interventions and effect, best practices, leaderboard, weekly e-mail, rule-based suggestions | Done; AI write-up of suggestions not built |
+| 3 | Interventions and effect, best practices, leaderboard, weekly e-mail, rule-based suggestions with AI ideas | Done |
 | 4 | Research mode: projects, test/control groups, questionnaires, anonymised export | Tables ready, no screens |
 | 5 | Public impact page, weather correlation, external integrations (scales, POS) | Impact page and weather card done; integrations not built |
 
@@ -163,6 +163,15 @@ active or planned intervention (same dish, or the product name in its title) are
 up to 2 examples: a published best practice of the organization with the same reason first, then industry examples.
 The Interventions page shows at most 3, never two about the same thing, each with a "Start this" button that fills
 in a new intervention (title, why, restaurant, reason, category or dish). Numbers come from the rules only.
+
+When the rules find nothing for a restaurant (too little data), the biggest avoidable product of the window is shown
+as an **early signal** (rule `early`, 0043), with the number of registrations it is based on.
+
+**Ask AI for ideas** calls the `suggest-ideas` edge function. It does not trust the browser: it calls
+`intervention_suggestions` again as the signed-in user, picks the matching suggestion, adds up to 2 recent photos of
+that product or dish, and asks Claude for 2 or 3 concrete interventions. Ideas are labelled as AI; any idea that
+contains a figure not present in the facts (other than clock times and small counts) is discarded. "Start this" on an
+idea fills in its title and description.
 
 **Impact poster** (`web/js/poster.js`, gallery) prints one A4 page for this or last month. Blame-free by design:
 we-language, no names or sections, the good news first (only when waste per day fell 3% or more, otherwise the

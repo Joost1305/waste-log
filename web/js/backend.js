@@ -325,6 +325,8 @@ route('GET', '/interventions', async () => check(await sb.rpc('interventions_lis
 // suggested interventions: patterns in the last weeks of waste, found by rules (0042)
 route('GET', '/intervention-suggestions', async ({ query }) => check(await sb.rpc('intervention_suggestions', {
   p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_days: num(query.days) || 28, p_lang: ctx.lang })));
+// AI ideas for one suggestion (edge function suggest-ideas; numbers are recomputed there)
+route('POST', '/suggest-ideas', async ({ body }) => invoke('suggest-ideas', { ...body, organization_id: ctx.orgId, lang: ctx.lang }));
 route('GET', '/interventions/:id/effect', async ({ p, query }) =>
   check(await sb.rpc('intervention_effect', { p_id: Number(p.id), p_days: num(query.days) || 28 })));
 route('POST', '/interventions', async ({ body }) =>

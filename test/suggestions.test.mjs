@@ -48,3 +48,18 @@ test('suggestions: an active intervention on the same product hides the suggesti
   const s = await suggest(U.mgrHague, ID.hague);
   assert.ok(!s.find((x) => x.product_name === 'Tomatoes'));
 });
+
+test('suggestions: with little data the biggest product shows as an early signal', async () => {
+  const org = (await one(`select organization_id o from restaurants where id = $1`, [ID.hague])).o;
+  const rid = (await one(`insert into restaurants (organization_id, name, slug) values ($1, 'Pop-up Test', 'pop-up-test') returning id`, [org])).id;
+  const admin = await userId(db, 'orgadmin@hth.demo');
+  for (const ago of [1, 3]) {
+    await db.query(`insert into waste_records (restaurant_id, product_id, reason_id, weight_kg, entered_unit, user_id, recorded_at)
+      values ($1, $2, $3, 1.5, 'kg', $4, now() - make_interval(days => $5))`, [rid, ID.tomato, ID.spoilage, admin, ago]);
+  }
+  const s = await suggest(admin, rid);
+  assert.equal(s.length, 1);
+  assert.equal(s[0].rule, 'early');
+  assert.equal(s[0].product_name, 'Tomatoes');
+  assert.equal(s[0].records, 2);
+});

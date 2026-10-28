@@ -126,7 +126,8 @@ function dayName(dow) {
 function subject(s) { return s.rule === 'plate' ? s.menu_item : s.rule === 'weekday' ? dayName(s.dow) : s.product_name; }
 function seen(s) {
   const v = { p: esc(subject(s)), s: pctf(s.share_pct), kg: fmt.kg(s.kg, 1), v: fmt.money(s.value), d: s.period_days,
-    n: s.rule === 'plate' ? s.records : s.days, r: esc(s.reason || ''), b: fmt.kg(s.base_kg, 1) };
+    n: s.rule === 'plate' || s.rule === 'early' ? s.records : s.days,
+    r: esc(s.rule === 'early' ? String(s.reason || '').toLowerCase() : s.reason || ''), b: fmt.kg(s.base_kg, 1) };
   return t('sg_seen_' + s.rule, v);
 }
 function idea(s) {
@@ -153,25 +154,47 @@ function suggestionsHtml() {
   if (!shown.length) return '';
   const multi = new Set(shown.map((s) => s.restaurant_id)).size > 1 || state.meta.restaurants.length > 1;
   return `<div class="card sg-card no-print"><h2>${t('sg_title')}</h2><div class="small muted">${t('sg_sub')}</div>
-    <div class="sg-list">${shown.map((s, i) => `<div class="sg-item">
+    <div class="sg-list">${shown.map((s, i) => `<div class="sg-item"><div class="sg-row">
       <div class="sg-main">${multi ? `<div class="small muted">${esc(s.restaurant_name)}</div>` : ''}
         <div class="sg-seen">${seen(s)}</div>
         <div class="sg-idea">${t('sg_try')}: <strong>${esc(idea(s))}</strong></div>
         ${s.example ? `<div class="small muted sg-ex">${t(s.example.kind === 'own' ? 'sg_ex_own' : 'sg_ex_ind')}:
           <a href="#/interventions/${s.example.kind === 'own' ? 'best-practices' : 'industry'}">${esc(s.example.title)}</a>${s.example.who ? ` (${esc(s.example.who)})` : ''}${s.example.result_change_pct != null ? `, ${pctf(s.example.result_change_pct)}` : ''}</div>` : ''}</div>
-      <button type="button" class="btn-sm btn-primary" data-sg="${i}">${t('sg_start')}</button></div>`).join('')}</div></div>`;
+      <div class="sg-btns"><button type="button" class="btn-sm btn-primary" data-sg="${i}">${t('sg_start')}</button>
+        <button type="button" class="btn-sm btn-ghost" data-ai="${i}">${t('sg_ai')}</button></div></div>
+      <div class="sg-ai" id="sg-ai-${i}"></div></div>`).join('')}</div></div>`;
+}
+// A new intervention, filled in from a suggestion (and optionally an AI idea for it)
+function startFrom(s, ai) {
+  editIntervention(null, {
+    title: ai ? ai.title : idea(s), description: ai ? ai.how : '', restaurant_id: s.restaurant_id, start_date: todayIso(), status: 'active',
+    reason: new DOMParser().parseFromString(seen(s), 'text/html').body.textContent,
+    scope_reason_id: s.reason_id || '',
+    scope_waste_category_id: s.rule === 'weekday' || s.rule === 'plate' ? '' : s.waste_category_id || '',
+    scope_menu_item_id: s.menu_item_id || '',
+  });
+}
+// "Ask AI for ideas": the edge function recomputes the numbers itself and returns 2 or 3 ideas, labelled as AI
+async function askAi(i, btn) {
+  const s = shown[i]; const box = $(`#sg-ai-${i}`);
+  btn.disabled = true;
+  box.innerHTML = `<div class="small muted"><span class="spinner"></span> ${t('sg_ai_busy')}</div>`;
+  let r;
+  try {
+    r = (await api('/suggest-ideas', { method: 'POST', body: {
+      restaurant_id: s.restaurant_id, rule: s.rule, subject: String(s.rule === 'weekday' ? s.dow : subject(s)) } })).data;
+  } catch (e) { box.innerHTML = `<div class="small muted">${esc(e.message)}</div>`; btn.disabled = false; return; }
+  if (!r || r.available === false) { box.innerHTML = `<div class="small muted">${t('sg_ai_off')}</div>`; return; }
+  if (!r.ideas || !r.ideas.length) { box.innerHTML = `<div class="small muted">${t('sg_ai_none')}</div>`; btn.disabled = false; return; }
+  s.ai = r.ideas;
+  box.innerHTML = `<div class="sg-ai-label">${t('sg_ai_label')}</div>
+    ${r.ideas.map((x, k) => `<div class="sg-ai-idea"><div><strong>${esc(x.title)}</strong><div class="small">${esc(x.how)}</div></div>
+      <button type="button" class="btn-sm" data-ai-start="${i}:${k}">${t('sg_start')}</button></div>`).join('')}`;
+  $$('[data-ai-start]', box).forEach((b) => (b.onclick = () => { const [a, k] = b.dataset.aiStart.split(':').map(Number); startFrom(shown[a], shown[a].ai[k]); }));
 }
 function bindSuggestions() {
-  $$('[data-sg]').forEach((b) => (b.onclick = () => {
-    const s = shown[Number(b.dataset.sg)];
-    editIntervention(null, {
-      title: idea(s), restaurant_id: s.restaurant_id, start_date: todayIso(), status: 'active',
-      reason: new DOMParser().parseFromString(seen(s), 'text/html').body.textContent,
-      scope_reason_id: s.reason_id || '',
-      scope_waste_category_id: s.rule === 'weekday' || s.rule === 'plate' ? '' : s.waste_category_id || '',
-      scope_menu_item_id: s.menu_item_id || '',
-    });
-  }));
+  $$('[data-sg]').forEach((b) => (b.onclick = () => startFrom(shown[Number(b.dataset.sg)])));
+  $$('[data-ai]').forEach((b) => (b.onclick = () => askAi(Number(b.dataset.ai), b)));
 }
 
 function ivFields(restaurantId) {

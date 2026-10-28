@@ -331,11 +331,17 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .sg-card { margin-bottom: 14px; border-left: 4px solid var(--primary); }
 .sg-card h2 { margin: 0 0 2px; }
 .sg-list { display: grid; gap: 10px; margin-top: 12px; }
-.sg-item { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--line); }
+.sg-item { padding-top: 10px; border-top: 1px solid var(--line); }
+.sg-row { display: flex; gap: 14px; align-items: center; justify-content: space-between; }
+.sg-btns { display: flex; flex-direction: column; gap: 6px; align-items: stretch; flex: none; }
+.sg-ai:not(:empty) { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg-2, rgba(0,0,0,.035)); }
+.sg-ai-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); margin-bottom: 6px; }
+.sg-ai-idea { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 6px 0; }
+.sg-ai-idea + .sg-ai-idea { border-top: 1px dashed var(--line); }
 .sg-main { flex: 1; min-width: 0; }
 .sg-idea { margin-top: 3px; }
 .sg-ex { margin-top: 3px; }
-@media (max-width: 640px) { .sg-item { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 640px) { .sg-row, .sg-ai-idea { flex-direction: column; align-items: flex-start; } .sg-btns { flex-direction: row; } }
 .iv-side { flex: 0 0 190px; text-align: right; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .iv-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .iv-effect { font-size: 1.5rem; font-weight: 750; line-height: 1.1; font-variant-numeric: tabular-nums; }
