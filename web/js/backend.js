@@ -322,6 +322,9 @@ route('GET', '/my-org-slug', async () => check(await sb.rpc('my_org_slug', { p_o
 const IV_FIELDS = ['restaurant_id', 'title', 'reason', 'description', 'type', 'start_date', 'end_date', 'status', 'responsible_label',
   'expected_change_pct', 'scope_waste_category_id', 'scope_reason_id', 'scope_menu_item_id'];
 route('GET', '/interventions', async () => check(await sb.rpc('interventions_list', { p_org: ctx.orgId, p_lang: ctx.lang })));
+// suggested interventions: patterns in the last weeks of waste, found by rules (0042)
+route('GET', '/intervention-suggestions', async ({ query }) => check(await sb.rpc('intervention_suggestions', {
+  p_org: ctx.orgId, p_restaurant: num(query.restaurant_id), p_days: num(query.days) || 28, p_lang: ctx.lang })));
 route('GET', '/interventions/:id/effect', async ({ p, query }) =>
   check(await sb.rpc('intervention_effect', { p_id: Number(p.id), p_days: num(query.days) || 28 })));
 route('POST', '/interventions', async ({ body }) =>

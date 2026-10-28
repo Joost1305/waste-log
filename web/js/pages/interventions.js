@@ -14,6 +14,7 @@ let ivs = []; let bps = { rows: [], categories: [] };
 let filt = { restaurant_id: '', status: '', category_id: '' };
 let chart = null;
 let industry = null; // curated examples from elsewhere (tab 'industry')
+let sugg = []; // suggested interventions from the rules (0042)
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const canManage = () => !!state.meta.permissions.dashboard;
 
@@ -43,7 +44,12 @@ export async function renderInterventions(rest = []) {
 
 async function load() {
   try {
-    if (tab === 'interventions') ivs = (await api('/interventions')).data || [];
+    if (tab === 'interventions') {
+      [ivs, sugg] = await Promise.all([
+        api('/interventions').then((r) => r.data || []),
+        api('/intervention-suggestions').then((r) => r.data || []).catch(() => []),
+      ]);
+    }
     else {
       bps = (await api('/best-practices')).data || { rows: [], categories: [] };
       if (tab === 'best-practices' && canManage() && !ivs.length) ivs = (await api('/interventions')).data || [];
@@ -81,11 +87,13 @@ function drawInterventions() {
       ${STATUSES.map((s) => `<option value="${s}" ${s === filt.status ? 'selected' : ''}>${t('iv_st_' + s)}</option>`).join('')}</select></div></form>` : '';
   if ($('#iv-f')) $('#iv-f').onchange = (e) => { filt[e.target.name] = e.target.value; drawInterventions(); };
   const rows = ivs.filter((i) => (!filt.restaurant_id || String(i.restaurant_id) === filt.restaurant_id) && (!filt.status || i.status === filt.status));
+  const sug = suggestionsHtml();
   if (!rows.length) {
-    $('#iv-body').innerHTML = `<div class="card empty">${ivs.length ? t('no_data') : t('iv_empty')}</div>`;
+    $('#iv-body').innerHTML = `${sug}<div class="card empty">${ivs.length ? t('no_data') : t('iv_empty')}</div>`;
+    bindSuggestions();
     return;
   }
-  $('#iv-body').innerHTML = `<div class="iv-list">${rows.map((i) => `
+  $('#iv-body').innerHTML = `${sug}<div class="iv-list">${rows.map((i) => `
     <div class="card iv-card">
       <div class="iv-main">
         <div class="small muted">${esc(i.restaurant_name)} · ${fmt.date(i.start_date)}${i.end_date ? ` – ${fmt.date(i.end_date)}` : ''}</div>
@@ -103,6 +111,67 @@ function drawInterventions() {
     </div>`).join('')}</div>`;
   $$('[data-eff]').forEach((b) => (b.onclick = () => showEffect(ivs.find((x) => x.id === Number(b.dataset.eff)))));
   $$('[data-edit]').forEach((b) => (b.onclick = () => editIntervention(ivs.find((x) => x.id === Number(b.dataset.edit)))));
+  bindSuggestions();
+}
+
+// ------------------------------------------------------------------ suggestions
+// Patterns the rules found in the last 4 weeks (0042). At most 3, never two about the same thing,
+// each with one example that worked elsewhere and a button that fills in a new intervention.
+let shown = [];
+const pctf = (n) => fmt.pct(Number(n), 0);
+function dayName(dow) {
+  // 2024-01-01 was a Monday (isodow 1)
+  return new Intl.DateTimeFormat(lang() === 'en' ? 'en-GB' : 'nl-NL', { weekday: 'long' }).format(new Date(2024, 0, dow));
+}
+function subject(s) { return s.rule === 'plate' ? s.menu_item : s.rule === 'weekday' ? dayName(s.dow) : s.product_name; }
+function seen(s) {
+  const v = { p: esc(subject(s)), s: pctf(s.share_pct), kg: fmt.kg(s.kg, 1), v: fmt.money(s.value), d: s.period_days,
+    n: s.rule === 'plate' ? s.records : s.days, r: esc(s.reason || ''), b: fmt.kg(s.base_kg, 1) };
+  return t('sg_seen_' + s.rule, v);
+}
+function idea(s) {
+  const p = subject(s);
+  if (s.rule === 'weekday' || s.rule === 'plate' || s.rule === 'spoilage') return t('sg_do_' + s.rule, { p });
+  const code = ['expired', 'storage'].includes(s.reason_code) ? 'spoilage' : s.reason_code;
+  const key = 'sg_do_' + code;
+  return t(t(key) === key ? 'sg_do_other' : key, { p });
+}
+function suggestionsHtml() {
+  shown = [];
+  const used = new Set(); const ex = new Set();
+  for (const s of sugg) {
+    if (filt.restaurant_id && String(s.restaurant_id) !== filt.restaurant_id) continue;
+    const k = `${s.restaurant_id}|${s.reason_code}|${s.rule === 'weekday' ? 'w' : subject(s)}`;
+    const k2 = `${s.restaurant_id}|${s.reason_code}`;
+    if (used.has(k) || (used.has(k2) && shown.length >= 2)) continue;
+    used.add(k); used.add(k2);
+    const e = s.examples.find((x) => !ex.has(x.kind + x.id)) || s.examples[0];
+    if (e) ex.add(e.kind + e.id);
+    shown.push({ ...s, example: e });
+    if (shown.length === 3) break;
+  }
+  if (!shown.length) return '';
+  const multi = new Set(shown.map((s) => s.restaurant_id)).size > 1 || state.meta.restaurants.length > 1;
+  return `<div class="card sg-card no-print"><h2>${t('sg_title')}</h2><div class="small muted">${t('sg_sub')}</div>
+    <div class="sg-list">${shown.map((s, i) => `<div class="sg-item">
+      <div class="sg-main">${multi ? `<div class="small muted">${esc(s.restaurant_name)}</div>` : ''}
+        <div class="sg-seen">${seen(s)}</div>
+        <div class="sg-idea">${t('sg_try')}: <strong>${esc(idea(s))}</strong></div>
+        ${s.example ? `<div class="small muted sg-ex">${t(s.example.kind === 'own' ? 'sg_ex_own' : 'sg_ex_ind')}:
+          <a href="#/interventions/${s.example.kind === 'own' ? 'best-practices' : 'industry'}">${esc(s.example.title)}</a>${s.example.who ? ` (${esc(s.example.who)})` : ''}${s.example.result_change_pct != null ? `, ${pctf(s.example.result_change_pct)}` : ''}</div>` : ''}</div>
+      <button type="button" class="btn-sm btn-primary" data-sg="${i}">${t('sg_start')}</button></div>`).join('')}</div></div>`;
+}
+function bindSuggestions() {
+  $$('[data-sg]').forEach((b) => (b.onclick = () => {
+    const s = shown[Number(b.dataset.sg)];
+    editIntervention(null, {
+      title: idea(s), restaurant_id: s.restaurant_id, start_date: todayIso(), status: 'active',
+      reason: new DOMParser().parseFromString(seen(s), 'text/html').body.textContent,
+      scope_reason_id: s.reason_id || '',
+      scope_waste_category_id: s.rule === 'weekday' || s.rule === 'plate' ? '' : s.waste_category_id || '',
+      scope_menu_item_id: s.menu_item_id || '',
+    });
+  }));
 }
 
 function ivFields(restaurantId) {
@@ -125,8 +194,8 @@ function ivFields(restaurantId) {
   ];
 }
 
-function editIntervention(iv) {
-  const values = iv ? { ...iv } : { start_date: todayIso(), status: 'active', restaurant_id: state.meta.restaurants[0] && state.meta.restaurants[0].id };
+function editIntervention(iv, preset) {
+  const values = iv ? { ...iv } : preset || { start_date: todayIso(), status: 'active', restaurant_id: state.meta.restaurants[0] && state.meta.restaurants[0].id };
   const fields = ivFields(values.restaurant_id);
   openModal(`<h2>${t(iv ? 'iv_edit' : 'iv_new')}</h2>
     <form id="iv-form">${formHtml(fields, values)}<div class="err" id="iv-err"></div>

@@ -328,6 +328,14 @@ a.chip { text-decoration: none; color: var(--ink); border: 1px solid var(--line)
 .iv-card h3 { margin: 4px 0 6px; font-size: 1.05rem; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .iv-card p { margin: 0 0 6px; }
 .iv-main { flex: 1; min-width: 0; }
+.sg-card { margin-bottom: 14px; border-left: 4px solid var(--primary); }
+.sg-card h2 { margin: 0 0 2px; }
+.sg-list { display: grid; gap: 10px; margin-top: 12px; }
+.sg-item { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--line); }
+.sg-main { flex: 1; min-width: 0; }
+.sg-idea { margin-top: 3px; }
+.sg-ex { margin-top: 3px; }
+@media (max-width: 640px) { .sg-item { flex-direction: column; align-items: flex-start; } }
 .iv-side { flex: 0 0 190px; text-align: right; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .iv-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .iv-effect { font-size: 1.5rem; font-weight: 750; line-height: 1.1; font-variant-numeric: tabular-nums; }
