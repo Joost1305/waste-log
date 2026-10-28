@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 24 October 2026, after migration 0041. Source of truth is the code in the
+Updated 28 October 2026, after migration 0042. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -72,7 +72,7 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0041). Groups:
+Schema in `supabase/migrations/` (0001 to 0042). Groups:
 
 - **Tenancy:** organizations, restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
@@ -92,9 +92,9 @@ Schema in `supabase/migrations/` (0001 to 0041). Groups:
 |---|---|---|
 | `#/register` | everyone | Register waste; quick buttons from most-registered products; today's weather and team streak in the header; kitchen mode |
 | `#/records` | everyone (own) / managers (all) | List with filters, weather per day, correct or delete |
-| `#/gallery` | everyone | Waste photos, heaviest first; filter estimated vs weighed; inedible trim hidden by default |
+| `#/gallery` | everyone | Waste photos, heaviest first; filter estimated vs weighed; inedible trim hidden by default; slideshow; impact poster (managers and up) |
 | `#/dashboard` | managers and up | Summary line, KPIs, daily chart, by category / reason / product / section, weather and waste, print, Excel export |
-| `#/interventions` | everyone | Interventions with before/after effect, best-practice library |
+| `#/interventions` | everyone | Suggested interventions (managers and up), interventions with before/after effect, best-practice library |
 | `#/leaderboard` | when switched on | Sections within a restaurant, prevention ideas |
 | `#/settings/...` | per permission | Products, suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, audit, organizations, system check |
 | `#/profile` | everyone | Name, language, password |
@@ -124,7 +124,8 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 |---|---|---|
 | Recognise food and estimate or read weight from a photo | `identify-food` | Live with `ANTHROPIC_API_KEY` |
 | Read supplier invoices (PDF, photo, Excel/CSV) | `read-invoice` | Live with key; manager checks every line |
-| Recommendations based on rules + AI | | Not built |
+| Suggested interventions from rules | `intervention_suggestions` (SQL, 0042) | Live, no AI |
+| AI write-up of suggestions | | Not built |
 
 - Without a key the functions answer `{ available: false }` and the app continues manually.
 - Output is validated and mapped onto the organization's own categories and products; unknown output is discarded.
@@ -141,7 +142,7 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 |---|---|---|
 | 1 | Auth, organizations, restaurants, users, waste registration, dashboard, targets | Done |
 | 2 | AI photo recognition, invoice upload and reading, CO₂ per product, sales reports | Done (sales optional per organization) |
-| 3 | Interventions and effect, best practices, leaderboard, weekly e-mail | Done; rule-based + AI recommendations not built |
+| 3 | Interventions and effect, best practices, leaderboard, weekly e-mail, rule-based suggestions | Done; AI write-up of suggestions not built |
 | 4 | Research mode: projects, test/control groups, questionnaires, anonymised export | Tables ready, no screens |
 | 5 | Public impact page, weather correlation, external integrations (scales, POS) | Impact page and weather card done; integrations not built |
 
@@ -151,3 +152,19 @@ New migrations go in `supabase/migrations/` with the next number. Several later 
 patch an existing function by text replacement (`pg_get_functiondef` + `replace`) and stop
 with an error when the expected text is not found, so they must be applied in order.
 Run `npm test` before pushing; apply the migration to the live project after the push.
+
+## 13. Suggested interventions and impact poster
+
+**Suggested interventions** (`intervention_suggestions`, 0042) look at the last 28 days of avoidable waste per
+restaurant and flag five patterns: one product is 15% or more of the kilos (`product`) or of the euros (`costly`),
+one product spoils or expires on 3 or more different days (`spoilage`), one dish comes back as plate waste 3 or more
+times (`plate`), one open weekday is 1.5 times or more the other open days (`weekday`). Patterns already covered by an
+active or planned intervention (same dish, or the product name in its title) are left out. Each suggestion carries
+up to 2 examples: a published best practice of the organization with the same reason first, then industry examples.
+The Interventions page shows at most 3, never two about the same thing, each with a "Start this" button that fills
+in a new intervention (title, why, restaurant, reason, category or dish). Numbers come from the rules only.
+
+**Impact poster** (`web/js/poster.js`, gallery) prints one A4 page for this or last month. Blame-free by design:
+we-language, no names or sections, the good news first (only when waste per day fell 3% or more, otherwise the
+number of registrations), a question under the heaviest photo, reasons instead of people, one thing we are trying
+now, and an empty box for ideas.
