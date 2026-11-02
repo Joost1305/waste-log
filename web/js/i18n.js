@@ -5,7 +5,7 @@ export const LANGS = { en: 'English', nl: 'Nederlands' };
 const dict = {
   en: {
     demo_banner: 'DEMO DATA: fictional data for demonstration',
-    nav_register: 'Register', nav_records: 'Records', nav_gallery: 'Gallery', gal_title: 'Photo gallery', gal_7: 'Last 7 days', gal_all: 'All time', gal_more: 'Show more', gal_photos: 'photos', gal_empty: 'No photos in this selection yet. Photos appear here when waste is registered with a photo.', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out',
+    nav_register: 'Register', nav_records: 'Records', nav_gallery: 'Gallery', gal_title: 'Photo gallery', gal_7: 'Last 7 days', gal_all: 'All time', gal_more: 'Show more', gal_photos: 'photos', gal_empty: 'No photos in this selection yet. Photos appear here when waste is registered with a photo.', nav_dashboard: 'Dashboard', nav_settings: 'Settings', nav_profile: 'Profile', nav_logout: 'Sign out', nav_more: 'More', nav_help: 'Help',
     login_title: 'Sign in', login_sub: 'Food waste registration & insight', email: 'Email', password: 'Password', sign_in: 'Sign in',
     demo_accounts: 'Try the demo, tap to sign in (password demo1234):', try_student: 'Try it out as a student, tap to sign in:', try_pw: 'password {p}', demo_admin: 'Admin', demo_student: 'Student', own_login_hint: 'enter your own password', forgot_pw: 'Forgot your password?', forgot_need_email: 'Fill in your e-mail address first.', forgot_sent: 'If {e} has an account, a reset link is on its way. Check your inbox and spam folder.',
     reg_title: 'Register waste', reg_restaurant: 'Restaurant',
@@ -349,7 +349,7 @@ const dict = {
     sc_f_schedule_mode: 'planning', sc_f_send_dates: 'datums', sc_f_open_days: 'open dagen', sc_f_target_kg: 'doel kg', sc_f_baseline_kg: 'startpunt kg',
     sc_f_deleted_at: 'verwijderd', sc_f_language: 'taal',
     demo_banner: 'DEMO DATA: fictieve gegevens voor demonstratie',
-    nav_register: 'Registreren', nav_records: 'Registraties', nav_gallery: 'Galerij', gal_title: 'Fotogalerij', gal_7: 'Laatste 7 dagen', gal_all: 'Alles', gal_more: 'Meer tonen', gal_photos: "foto's", gal_empty: "Nog geen foto's in deze selectie. Foto's verschijnen hier zodra waste met een foto wordt geregistreerd.", nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen',
+    nav_register: 'Registreren', nav_records: 'Registraties', nav_gallery: 'Galerij', gal_title: 'Fotogalerij', gal_7: 'Laatste 7 dagen', gal_all: 'Alles', gal_more: 'Meer tonen', gal_photos: "foto's", gal_empty: "Nog geen foto's in deze selectie. Foto's verschijnen hier zodra waste met een foto wordt geregistreerd.", nav_dashboard: 'Dashboard', nav_settings: 'Beheer', nav_profile: 'Profiel', nav_logout: 'Uitloggen', nav_more: 'Meer', nav_help: 'Help',
     login_title: 'Inloggen', login_sub: 'Voedselverspilling registreren en verbeteren', email: 'E-mail', password: 'Wachtwoord', sign_in: 'Inloggen',
     demo_accounts: 'Probeer de demo, tik om in te loggen (wachtwoord demo1234):', try_student: 'Probeer het als student, tik om in te loggen:', try_pw: 'wachtwoord {p}', demo_admin: 'Admin', demo_student: 'Student', own_login_hint: 'vul je eigen wachtwoord in', forgot_pw: 'Wachtwoord vergeten?', forgot_need_email: 'Vul eerst je e-mailadres in.', forgot_sent: 'Als {e} een account heeft, is er een herstellink onderweg. Kijk in je inbox en spammap.',
     reg_title: 'Waste registreren', reg_restaurant: 'Restaurant',

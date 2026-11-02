@@ -24,10 +24,12 @@
       <select id="org-switch" class="org-switch" hidden aria-label="Organization"></select>
       <a id="help-btn" class="help-q" href="help/staff.html" title="Help" aria-label="Help">?</a>
       <div id="lang-toggle" class="lang-toggle" role="group" aria-label="Language"></div>
-      <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Menu">&#9776;</button>
     </div>
   </header>
   <main id="app" class="app"></main>
+  <!-- Phone: menu as a bottom bar with icons; pages that do not fit sit under More -->
+  <nav id="tabbar" class="tabbar" hidden></nav>
+  <div id="more-sheet" class="more-sheet" hidden><div class="more-card"></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="modal" class="modal" hidden>
     <div class="modal-card" role="dialog" aria-modal="true"></div>
