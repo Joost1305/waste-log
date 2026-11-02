@@ -186,8 +186,8 @@ label { display: block; font-size: .85rem; font-weight: 600; color: var(--ink-2)
 .ai-card strong { font-size: 1rem; }
 .ai-note { font-size: .72rem; color: var(--ink-2); margin-top: 4px; }
 .weight-row { display: flex; gap: 10px; }
-.weight-row input { font-size: 2rem; font-weight: 700; padding: 10px 14px; text-align: right; font-variant-numeric: tabular-nums; }
-.unit-toggle { display: flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; flex-shrink: 0; }
+.weight-row input { flex: 1 1 0; min-width: 0; width: auto; font-size: 2rem; font-weight: 700; padding: 10px 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.unit-toggle { display: flex; flex: 0 0 auto; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
 .unit-toggle button { border: 0; border-radius: 0; min-width: 62px; font-size: 1.1rem; }
 .unit-toggle button.on { background: var(--primary); color: #fff; }
 .selected-line { margin-top: 10px; font-size: .9rem; color: var(--ink-2); }
@@ -647,6 +647,11 @@ tr.sc-current td { background: var(--surface-2); }
 .app.kitchen .chip { padding: 12px 18px; font-size: 1.05rem; }
 .app.kitchen .weight-row input { font-size: 2.8rem; padding: 14px 18px; }
 .app.kitchen .unit-toggle button { min-width: 80px; font-size: 1.3rem; }
+/* phone: the number gets the room; the g/kg buttons stay big enough to tap */
+@media (max-width: 520px) {
+  .weight-row input, .app.kitchen .weight-row input { font-size: clamp(1.8rem, 9vw, 2.4rem); padding: 10px 12px; }
+  .unit-toggle button, .app.kitchen .unit-toggle button { min-width: 54px; width: 54px; padding: 0; font-size: 1.1rem; }
+}
 .app.kitchen .quick-weights { gap: 8px; }
 .app.kitchen .quick-weights button { padding: 16px 6px; font-size: 1.1rem; }
 .app.kitchen .photo-btn { padding: 20px; font-size: 1.15rem; }
