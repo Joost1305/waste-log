@@ -819,3 +819,29 @@ test('closed days: waste logged on a closed day is in the total, not in kg per r
     await db.query('update restaurants set open_days = $2 where id = $1', [ID.ams, old]);
   }
 });
+
+test('page access: org admin hides pages per role, the student menu follows, managers cannot change it', async () => {
+  try {
+    await as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set hidden_pages = $1 where id = $2`,
+      [{ employee: ['records', 'gallery'], restaurant_manager: ['leaderboard'] }, ID.hth]));
+    const student = await as(db, U['student@hth'], async ({ one }) => (await one('select app_meta() m')).m);
+    assert.deepEqual(student.hidden_pages, ['records', 'gallery']);
+    const mgr = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select app_meta() m')).m);
+    assert.deepEqual(mgr.hidden_pages, ['leaderboard']);
+    const admin = await as(db, U['orgadmin@hth'], async ({ one }) => (await one('select app_meta() m')).m);
+    assert.deepEqual(admin.hidden_pages, []);
+    assert.deepEqual(admin.organization.hidden_pages.employee, ['records', 'gallery']);
+    const sup = await as(db, U['admin@platform'], async ({ one }) => (await one('select app_meta($1) m', [ID.hth])).m);
+    assert.deepEqual(sup.hidden_pages, []);
+    // another organization is not affected
+    const bistro = await as(db, U['admin@bistro'], async ({ one }) => (await one('select app_meta() m')).m);
+    assert.deepEqual(bistro.hidden_pages, []);
+    // a manager's update touches nothing (RLS), unknown roles or pages are refused
+    const upd = await as(db, U['manager.amsterdam@hth'], ({ q }) => q(`update organizations set hidden_pages = '{}' where id = $1 returning id`, [ID.hth]));
+    assert.equal(upd.length, 0);
+    await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set hidden_pages = $1 where id = $2`, [{ org_admin: ['records'] }, ID.hth])));
+    await assert.rejects(as(db, U['orgadmin@hth'], ({ q }) => q(`update organizations set hidden_pages = $1 where id = $2`, [{ employee: ['settings'] }, ID.hth])));
+  } finally {
+    await db.query(`update organizations set hidden_pages = '{}' where id = $1`, [ID.hth]);
+  }
+});

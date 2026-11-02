@@ -14,13 +14,16 @@ import { renderImpact } from './pages/impact.js';
 import { renderInterventions } from './pages/interventions.js';
 import { renderLeaderboard } from './pages/leaderboard.js';
 
+// Pages an organization admin can hide per role (Settings > Page access). Register, Settings and Profile always stay.
+const hidden = (path) => !!(state.meta && Array.isArray(state.meta.hidden_pages) && state.meta.hidden_pages.includes(path));
+
 const routes = [
   { path: 'register', render: renderRegister, nav: 'nav_register', show: () => true },
-  { path: 'dashboard', render: renderDashboard, nav: 'nav_dashboard', show: (p) => p.dashboard },
-  { path: 'records', render: renderRecords, nav: 'nav_records', show: () => true },
-  { path: 'gallery', render: renderGallery, nav: 'nav_gallery', show: () => true },
-  { path: 'interventions', render: renderInterventions, nav: 'nav_interventions', show: () => true },
-  { path: 'leaderboard', render: renderLeaderboard, nav: 'nav_leaderboard', show: () => !!(state.meta && state.meta.organization && state.meta.organization.leaderboard_enabled) },
+  { path: 'dashboard', render: renderDashboard, nav: 'nav_dashboard', show: (p) => p.dashboard && !hidden('dashboard') },
+  { path: 'records', render: renderRecords, nav: 'nav_records', show: () => !hidden('records') },
+  { path: 'gallery', render: renderGallery, nav: 'nav_gallery', show: () => !hidden('gallery') },
+  { path: 'interventions', render: renderInterventions, nav: 'nav_interventions', show: () => !hidden('interventions') },
+  { path: 'leaderboard', render: renderLeaderboard, nav: 'nav_leaderboard', show: () => !hidden('leaderboard') && !!(state.meta && state.meta.organization && state.meta.organization.leaderboard_enabled) },
   { path: 'settings', render: renderSettings, nav: 'nav_settings', show: (p) => p.catalog || p.users },
   { path: 'profile', render: renderProfile, nav: 'nav_profile', show: () => true },
 ];

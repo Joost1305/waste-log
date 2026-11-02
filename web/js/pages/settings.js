@@ -149,6 +149,7 @@ function sections() {
     p.dashboard && { key: 'leaderboard', title: t('set_leaderboard'), custom: renderLeaderboardSettings },
     p.dashboard && { key: 'export', title: t('set_export'), custom: renderExport },
     p.org_settings && { key: 'organization', title: t('set_org'), custom: renderOrg },
+    p.org_settings && { key: 'pages', title: t('pa_title'), custom: renderPageAccess },
     // The platform admin finds the audit log inside System check; organization admins keep their own tab
     p.audit && state.user.role !== 'super_admin' && { key: 'audit', title: t('set_audit'), custom: renderAudit },
     p.organizations && { key: 'organizations', title: t('set_orgs'), custom: renderOrganizations },
@@ -158,7 +159,7 @@ function sections() {
 
 // Where the "?" in Settings jumps to in the admin help page
 const HELP_ANCHOR = { products: '#products', invoices: '#products', suppliers: '#setup', menu: '#setup', covers: '#setup', targets: '#setup',
-  restaurants: '#setup', users: '#users', weekly: '#share', leaderboard: '#leaderboard', export: '#data', audit: '#data', organization: '#setup' };
+  restaurants: '#setup', users: '#users', pages: '#users', weekly: '#share', leaderboard: '#leaderboard', export: '#data', audit: '#data', organization: '#setup' };
 
 export async function renderSettings(rest) {
   const list = sections();
@@ -255,6 +256,41 @@ async function renderOrg(el) {
       await api('/organization', { method: 'PATCH', body }); await loadMeta(); toast(t('org_saved'));
       // The Sales page appears or disappears in the menu
       if (!!body.sales_enabled !== !!org.sales_enabled) renderSettings(['organization']);
+    } catch (err) { toastError(err); }
+  };
+}
+
+// ------------------------------------------------------------------ page access per role
+// Ticked = the role sees the page in the menu. Stored as the pages hidden per role, so new pages show by default.
+const PA_PAGES = ['records', 'gallery', 'interventions', 'leaderboard', 'dashboard'];
+const PA_ROLES = ['employee', 'restaurant_manager'];
+const PA_ALLOWED = { employee: (pg) => pg !== 'dashboard', restaurant_manager: () => true };   // the dashboard needs manager rank anyway
+
+async function renderPageAccess(el) {
+  let org;
+  try { org = (await api('/organization')).data; } catch (e) { toastError(e); return; }
+  const hid = org.hidden_pages || {};
+  const isHidden = (role, pg) => Array.isArray(hid[role]) && hid[role].includes(pg);
+  el.innerHTML = `<form class="card" id="pa-form"><h2>${t('pa_title')}</h2>
+    <p class="muted small">${t('pa_sub')}</p>
+    <div class="table-wrap"><table><thead><tr><th>${t('pa_page')}</th>${PA_ROLES.map((r) => `<th class="center">${t('role_' + r)}</th>`).join('')}</tr></thead><tbody>
+      ${PA_PAGES.map((pg) => `<tr><td>${t('nav_' + pg)}${pg === 'leaderboard' && !org.leaderboard_enabled ? ` <span class="small muted">(${t('pa_lb_off')})</span>` : ''}</td>
+        ${PA_ROLES.map((r) => `<td class="center">${PA_ALLOWED[r](pg)
+          ? `<input type="checkbox" data-role="${r}" data-page="${pg}" aria-label="${esc(t('nav_' + pg) + ', ' + t('role_' + r))}" ${isHidden(r, pg) ? '' : 'checked'}>`
+          : `<span class="small muted">${t('pa_na')}</span>`}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>
+    <p class="small muted">${t('pa_always')}</p>
+    <button class="btn-primary" type="submit">${t('save')}</button></form>`;
+  $('#pa-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const out = {};
+    PA_ROLES.forEach((r) => {
+      const off = $$(`input[data-role="${r}"]`, el).filter((c) => !c.checked).map((c) => c.dataset.page);
+      if (off.length) out[r] = off;
+    });
+    try {
+      await api('/organization', { method: 'PATCH', body: { hidden_pages: out } });
+      await loadMeta(); toast(t('pa_saved'));
     } catch (err) { toastError(err); }
   };
 }

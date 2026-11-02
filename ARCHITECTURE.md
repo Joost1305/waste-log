@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 28 October 2026, after migration 0043. Source of truth is the code in the
+Updated 2 November 2026, after migration 0044. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -57,6 +57,12 @@ Roles have a rank; Row Level Security checks the rank and the restaurants a user
 | Organization Admin | 50 | Whole organization: also restaurants, users, targets, organization settings, audit log |
 | Super Admin | 100 | All organizations, new organizations, system check |
 
+**Page access (0044).** An organization admin can hide pages per role in Settings › Page access
+(Records, Gallery, Interventions, Leaderboard, Dashboard, for Employee / Student and Restaurant Manager).
+Stored as `organizations.hidden_pages` (pages hidden per role); `app_meta` returns the list for the signed-in
+user and the router leaves those pages out of the menu and refuses the route. Register, Settings and Profile
+always stay; org admins and super admins are never restricted. This is visibility only: RLS still decides the data.
+
 Users and roles can only be changed through the `admin-users` edge function, which re-checks
 permissions. A user can never grant a role above their own.
 
@@ -72,9 +78,9 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0043). Groups:
+Schema in `supabase/migrations/` (0001 to 0044). Groups:
 
-- **Tenancy:** organizations, restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
+- **Tenancy:** organizations (incl. `hidden_pages`), restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
 - **Purchasing:** suppliers, products (prices, CO₂ per product from RIVM, English name), invoices, invoice_items
 - **Sales (optional per organization):** sales_reports, sales_lines, sales_groups, sales_item_links
@@ -96,7 +102,7 @@ Schema in `supabase/migrations/` (0001 to 0043). Groups:
 | `#/dashboard` | managers and up | Summary line, KPIs, daily chart, by category / reason / product / section, weather and waste, print, Excel export |
 | `#/interventions` | everyone | Suggested interventions (managers and up), interventions with before/after effect, best-practice library |
 | `#/leaderboard` | when switched on | Sections within a restaurant, prevention ideas |
-| `#/settings/...` | per permission | Products, suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, audit, organizations, system check |
+| `#/settings/...` | per permission | Products, suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, page access, audit, organizations, system check |
 | `#/profile` | everyone | Name, language, password |
 | `#/impact` | public, by link | Aggregated waste trend of a restaurant or organization |
 

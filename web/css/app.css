@@ -35,6 +35,8 @@ h3 { font-size: .95rem; margin: 0 0 8px; color: var(--ink-2); font-weight: 600; 
 .hidden { display: none !important; }
 .nowrap { white-space: nowrap; }
 .right { text-align: right; }
+.center { text-align: center; }
+#pa-form input[type="checkbox"] { width: 22px; height: 22px; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------ layout */
