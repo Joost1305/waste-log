@@ -238,3 +238,90 @@ export function bindPlaceFields(root) {
     input.addEventListener('input', () => set(null, null));
   });
 }
+
+// ------------------------------------------------------------------ filters on a phone
+// On a phone a filter card pushes the content (photos, records, charts) below the fold. This puts a small
+// "Filters" bar in its place that lists what is changed from the start, and opens the same form as a panel
+// from the bottom. The form and its change handler stay untouched, so results update live behind the panel.
+// Desktop sees the normal card (the bar and panel styles only apply at phone width).
+export function mobileFilters(form) {
+  if (!form) return;
+  const fields = () => [...form.querySelectorAll('select, input')].filter((x) => x.name && !x.closest('.hidden'));
+  const start = new Map(fields().map((x) => [x.name, x.value]));
+  const bar = document.createElement('button');
+  bar.type = 'button';
+  bar.className = 'filter-bar no-print';
+  bar.setAttribute('aria-expanded', 'false');
+  form.before(bar);
+  form.classList.add('filters-sheetable');
+  const head = document.createElement('div');
+  head.className = 'fsheet-head';
+  head.innerHTML = `<strong>${t('flt_title')}</strong><button type="button" class="btn-sm btn-ghost" data-reset>${t('flt_reset')}</button><button type="button" class="btn-sm btn-primary" data-done>${t('flt_done')}</button>`;
+  form.prepend(head);
+  const backdrop = document.createElement('div');
+  backdrop.className = 'fsheet-backdrop';
+  backdrop.hidden = true;
+  form.after(backdrop);
+
+  const label = (x) => (x.tagName === 'SELECT' ? x.options[x.selectedIndex]?.text : fmt.date(x.value));
+  const draw = () => {
+    const changed = fields().filter((x) => start.has(x.name) && x.value !== start.get(x.name));
+    bar.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span class="fb-label">${t('flt_title')}</span>${changed.length ? `<span class="fb-count">${changed.length}</span>` : ''}
+      <span class="fb-chips">${changed.map((x) => `<span class="fb-chip">${esc(label(x))}</span>`).join('')}</span>`;
+  };
+  const open = (on) => {
+    form.classList.toggle('sheet-open', on); backdrop.hidden = !on; bar.setAttribute('aria-expanded', String(on));
+    document.body.classList.toggle('fsheet-on', on);
+  };
+  bar.onclick = () => open(true);
+  backdrop.onclick = () => open(false);
+  head.querySelector('[data-done]').onclick = () => open(false);
+  head.querySelector('[data-reset]').onclick = () => {
+    fields().forEach((x) => { if (start.has(x.name) && x.value !== start.get(x.name)) {
+      x.value = start.get(x.name); x.dispatchEvent(new Event('change', { bubbles: true }));
+    } });
+    draw();
+  };
+  form.addEventListener('change', () => setTimeout(draw, 0));
+  // leaving the page while the panel is open must not leave the body locked
+  window.addEventListener('hashchange', () => document.body.classList.remove('fsheet-on'), { once: true });
+  draw();
+}
+
+// ------------------------------------------------------------------ page buttons on a phone
+// Print, export, slideshow, kitchen screen and the like are rarely used on a phone but push the content down.
+// At phone width they fold into one "more" button next to the page title; a button marked data-keep stays visible.
+// The original buttons stay in place (hidden), so their own click handlers and links keep working.
+export function compactActions(root) {
+  root.querySelectorAll('.page-head > .page-actions:not([data-compact])').forEach((box) => {
+    box.dataset.compact = '1';
+    const folded = [...box.children].filter((b) => (b.matches('button, a')) && !b.hasAttribute('data-keep'));
+    if (!folded.length) return;
+    folded.forEach((b) => b.classList.add('pa-folded'));
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'btn-sm pa-more';
+    more.setAttribute('aria-label', t('nav_more'));
+    more.setAttribute('aria-haspopup', 'true');
+    more.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+    box.append(more);
+    const menu = document.createElement('div');
+    menu.className = 'pa-menu';
+    menu.hidden = true;
+    menu.innerHTML = folded.map((b, i) => `<button type="button" data-i="${i}">${esc(b.textContent.trim())}</button>`).join('');
+    box.append(menu);
+    const close = (e) => { if (!e || !box.contains(e.target)) { menu.hidden = true; document.removeEventListener('click', close); } };
+    more.onclick = (e) => {
+      e.stopPropagation();
+      menu.hidden = !menu.hidden;
+      if (!menu.hidden) setTimeout(() => document.addEventListener('click', close), 0);
+    };
+    menu.onclick = (e) => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      close();
+      folded[Number(b.dataset.i)].click();
+    };
+  });
+}

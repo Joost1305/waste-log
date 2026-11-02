@@ -1,5 +1,5 @@
 // App shell and router (hash based, no build step).
-import { state, api, loadMeta, $, esc, app, toastError, renderLangToggle } from './core.js';
+import { state, api, loadMeta, $, esc, app, toastError, renderLangToggle, compactActions } from './core.js';
 import { t, setLang } from './i18n.js';
 import { resetCo2Cache } from './co2.js';
 import { renderLogin } from './pages/login.js';
@@ -168,6 +168,9 @@ async function route() {
   window.scrollTo(0, 0);
   try { await r.render(rest); } catch (e) { console.error(e); toastError(e); }
 }
+
+// Pages draw their header (sometimes after loading data); fold their buttons for phones whenever one appears.
+new MutationObserver(() => compactActions(app())).observe(app(), { childList: true, subtree: true });
 
 window.addEventListener('hashchange', route);
 window.addEventListener('fw:lang', async () => { resetCo2Cache(); if (state.user) await loadMeta(); route(); });

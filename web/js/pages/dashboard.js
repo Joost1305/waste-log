@@ -1,7 +1,7 @@
 // Management dashboard. All numbers come from the dashboard() database function.
 // Chart rules: one measure per chart (no dual axes), single hue for single-series
 // charts, recessive grid, hover tooltips on every chart, tables next to charts.
-import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, printHeader, printPage } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, printHeader, printPage, mobileFilters } from '../core.js';
 import { t } from '../i18n.js';
 import { exportDashboard } from '../export.js';
 import { showCo2Info } from '../co2.js';
@@ -35,6 +35,7 @@ export async function renderDashboard() {
       <div class="custom-range hidden"><label>${t('to')}</label><input type="date" name="to" value="${q.to}"></div>
     </form>
     <div id="dash-body" style="margin-top:16px"><div class="card empty"><span class="spinner"></span></div></div>`;
+  mobileFilters($('#dash-filters'));
   $('#dash-filters').onchange = (e) => {
     const { name, value } = e.target;
     q[name] = value;

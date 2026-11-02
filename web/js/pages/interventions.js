@@ -27,7 +27,7 @@ export async function renderInterventions(rest = []) {
     <div class="page-head"><div><h1>${t(canManage() ? 'iv_title' : 'bp_title')}</h1><div class="muted small">${t(canManage() ? 'iv_sub' : 'bp_sub')}</div></div>
       <div class="page-actions no-print">
         <button type="button" class="btn-sm" id="iv-print">&#128424; ${t('print')}</button>
-        ${canManage() && own ? `<button type="button" class="btn-sm btn-primary" id="iv-new">+ ${t(tab === 'interventions' ? 'iv_new' : 'bp_new')}</button>` : ''}
+        ${canManage() && own ? `<button type="button" class="btn-sm btn-primary" id="iv-new" data-keep>+ ${t(tab === 'interventions' ? 'iv_new' : 'bp_new')}</button>` : ''}
       </div></div>
     <div class="chips no-print" style="margin-bottom:10px">
       <a class="chip ${own ? 'on' : ''}" href="#/interventions${canManage() ? '' : '/best-practices'}">${t('bp_own')}</a>

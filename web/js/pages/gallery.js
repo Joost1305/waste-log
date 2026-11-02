@@ -1,6 +1,6 @@
 // Photo gallery: waste with a photo, sorted by weight (heaviest or lightest first), by category or by date.
 // Photos are private; each is shown through a short-lived signed link.
-import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, openModal, confirmDialog, printHeader, printPage } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, openModal, confirmDialog, printHeader, printPage, mobileFilters } from '../core.js';
 import { t } from '../i18n.js';
 import { photoUrls } from '../backend.js';
 import { showCo2Info } from '../co2.js';
@@ -38,6 +38,7 @@ export async function renderGallery() {
     <div id="gal-summary" class="muted small" style="margin:14px 2px 10px"></div>
     <div id="gal-grid"></div>
     <div style="text-align:center;margin-top:16px" class="no-print"><button class="hidden" id="gal-more">${t('gal_more')}</button></div>`;
+  mobileFilters($('#gal-filters'));
   $('#gal-filters').onchange = (e) => { q[e.target.name] = e.target.value; load(true); };
   $('#gal-more').onclick = () => load(false);
   $('#gal-print').onclick = () => printPage();

@@ -1,5 +1,5 @@
 // Waste records: filter, review, correct, delete.
-import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, openModal, confirmDialog, formHtml, readForm, printHeader, printPage } from '../core.js';
+import { state, api, app, esc, fmt, toast, toastError, todayIso, addDaysIso, $, $$, openModal, confirmDialog, formHtml, readForm, printHeader, printPage, mobileFilters } from '../core.js';
 import { t } from '../i18n.js';
 import { photoUrl } from '../backend.js';
 import { exportRecords } from '../export.js';
@@ -28,6 +28,7 @@ export async function renderRecords() {
       <div><label>${t('reason')}</label>${sel('reason_id', meta.waste_reasons, (x) => x.label)}</div>
     </form>
     <div class="card" style="margin-top:16px"><div id="rec-list"><span class="spinner"></span></div></div>`;
+  mobileFilters($('#rec-filters'));
   $('#rec-filters').onchange = (e) => { f[e.target.name] = e.target.value; f.offset = 0; selected.clear(); load(); };
   $('#rec-print').onclick = () => printPage();
   $('#rec-xlsx').onclick = () => exportRecords(f);

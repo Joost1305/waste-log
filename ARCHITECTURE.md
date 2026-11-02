@@ -109,7 +109,10 @@ Schema in `supabase/migrations/` (0001 to 0044). Groups:
 **Navigation.** Desktop: page links in the top bar. Phone (820px and narrower): a bottom bar with icons
 (`app.js`, `TAB_ORDER`); the first four visible pages get a tab, everything else plus Help and Sign out sits under
 More. Staff get Register, Records, Improve, Gallery; managers get Register, Dashboard, Records, Improve.
-Hidden pages (Page access) drop out of both.
+Hidden pages (Page access) drop out of both. On a phone, filter cards (Gallery, Records, Dashboard) collapse
+into a Filters bar that opens a bottom panel (`mobileFilters` in core.js), and page buttons such as Print, Export,
+Slideshow and Kitchen screen fold into a "more" button next to the title (`compactActions`, `data-keep` keeps one
+visible). The kitchen screen button is for managers and up.
 
 ## 7. Dashboard rules
 

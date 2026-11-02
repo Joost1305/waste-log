@@ -70,7 +70,7 @@ function draw() {
   $('#lb').innerHTML = `
     <div class="page-head"><div><h1>${t('lb_title')}</h1><div class="muted small">${t('lb_sub')}</div></div>
       <div class="page-actions no-print">
-        <a class="btn-sm btn" href="#/leaderboard/screen">&#128250; ${t('lb_screen')}</a>
+        ${state.meta.permissions.dashboard ? `<a class="btn-sm btn" href="#/leaderboard/screen">&#128250; ${t('lb_screen')}</a>` : ''}
         <button type="button" class="btn-sm" id="lb-print">&#128424; ${t('print')}</button></div></div>
     ${d.restaurants.length > 1 ? `<div class="chips no-print" style="margin-bottom:10px">${d.restaurants.map((r) =>
       `<button type="button" class="chip ${r.id === d.restaurant_id ? 'on' : ''}" data-r="${r.id}">${esc(r.name)}</button>`).join('')}</div>` : ''}
