@@ -106,6 +106,11 @@ Schema in `supabase/migrations/` (0001 to 0044). Groups:
 | `#/profile` | everyone | Name, language, password |
 | `#/impact` | public, by link | Aggregated waste trend of a restaurant or organization |
 
+**Navigation.** Desktop: page links in the top bar. Phone (820px and narrower): a bottom bar with icons
+(`app.js`, `TAB_ORDER`); the first four visible pages get a tab, everything else plus Help and Sign out sits under
+More. Staff get Register, Records, Improve, Gallery; managers get Register, Dashboard, Records, Improve.
+Hidden pages (Page access) drop out of both.
+
 ## 7. Dashboard rules
 
 - **A day without registrations is no data, never zero waste.** It is left out of every average and reported as "open days without registrations".
