@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 2 November 2026, after migration 0044. Source of truth is the code in the
+Updated 2 November 2026, after migration 0045. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -78,7 +78,7 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0044). Groups:
+Schema in `supabase/migrations/` (0001 to 0045). Groups:
 
 - **Tenancy:** organizations (incl. `hidden_pages`), restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
@@ -100,7 +100,7 @@ Schema in `supabase/migrations/` (0001 to 0044). Groups:
 | `#/records` | everyone (own) / managers (all) | List with filters, weather per day, correct or delete |
 | `#/gallery` | everyone | Waste photos, heaviest first; filter estimated vs weighed; inedible trim hidden by default; slideshow; impact poster (managers and up) |
 | `#/dashboard` | managers and up | Summary line, KPIs, daily chart, by category / reason / product / section, weather and waste, print, Excel export |
-| `#/interventions` | everyone | Suggested interventions (managers and up), interventions with before/after effect, best-practice library |
+| `#/interventions` | everyone | Page "Improve": tabs Interventions / Best practices / Industry. Everyone reads the organization's interventions with their before/after effect (0045); suggestions, new and edit for managers and up |
 | `#/leaderboard` | when switched on | Sections within a restaurant, prevention ideas |
 | `#/settings/...` | per permission | Products, suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, page access, audit, organizations, system check |
 | `#/profile` | everyone | Name, language, password |

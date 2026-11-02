@@ -20,21 +20,19 @@ const canManage = () => !!state.meta.permissions.dashboard;
 
 export async function renderInterventions(rest = []) {
   // Two worlds: our own kitchens (interventions, best practices) and examples from the industry
-  tab = rest[0] === 'industry' ? 'industry' : rest[0] === 'best-practices' || !canManage() ? 'best-practices' : 'interventions';
+  tab = rest[0] === 'industry' ? 'industry' : rest[0] === 'best-practices' ? 'best-practices' : 'interventions';
   const own = tab !== 'industry';
   filt.category_id = '';
   app().innerHTML = `
-    <div class="page-head"><div><h1>${t(canManage() ? 'iv_title' : 'bp_title')}</h1><div class="muted small">${t(canManage() ? 'iv_sub' : 'bp_sub')}</div></div>
+    <div class="page-head"><div><h1>${t('nav_interventions')}</h1><div class="muted small">${t('iv_sub')}</div></div>
       <div class="page-actions no-print">
         <button type="button" class="btn-sm" id="iv-print">&#128424; ${t('print')}</button>
         ${canManage() && own ? `<button type="button" class="btn-sm btn-primary" id="iv-new" data-keep>+ ${t(tab === 'interventions' ? 'iv_new' : 'bp_new')}</button>` : ''}
       </div></div>
-    <div class="chips no-print" style="margin-bottom:10px">
-      <a class="chip ${own ? 'on' : ''}" href="#/interventions${canManage() ? '' : '/best-practices'}">${t('bp_own')}</a>
-      <a class="chip ${!own ? 'on' : ''}" href="#/interventions/industry">${t('bp_industry')}</a></div>
-    ${canManage() && own ? `<div class="chips chips-sub no-print" style="margin-bottom:14px">
-      <a class="chip ${tab === 'interventions' ? 'on' : ''}" href="#/interventions">${t('iv_tab')}</a>
-      <a class="chip ${tab === 'best-practices' ? 'on' : ''}" href="#/interventions/best-practices">${t('bp_tab')}</a></div>` : ''}
+    <div class="seg no-print" role="tablist">
+      <a class="seg-item ${tab === 'interventions' ? 'on' : ''}" href="#/interventions" role="tab">${t('iv_tab')}</a>
+      <a class="seg-item ${tab === 'best-practices' ? 'on' : ''}" href="#/interventions/best-practices" role="tab">${t('bp_tab')}</a>
+      <a class="seg-item ${tab === 'industry' ? 'on' : ''}" href="#/interventions/industry" role="tab">${t('bp_industry_short')}</a></div>
     <div id="iv-filters"></div>
     <div id="iv-body"><div class="card empty"><span class="spinner"></span></div></div>`;
   $('#iv-print').onclick = () => printPage();
@@ -47,7 +45,7 @@ async function load() {
     if (tab === 'interventions') {
       [ivs, sugg] = await Promise.all([
         api('/interventions').then((r) => r.data || []),
-        api('/intervention-suggestions').then((r) => r.data || []).catch(() => []),
+        canManage() ? api('/intervention-suggestions').then((r) => r.data || []).catch(() => []) : [],
       ]);
     }
     else {
@@ -80,16 +78,16 @@ function focusText(i) {
 
 function drawInterventions() {
   const rests = [...new Map(ivs.map((i) => [i.restaurant_id, i.restaurant_name])).entries()];
-  $('#iv-filters').innerHTML = ivs.length ? `<form class="card filters no-print" id="iv-f">
-    ${rests.length > 1 ? `<div><label>${t('restaurant')}</label><select name="restaurant_id"><option value="">${t('all_restaurants')}</option>
-      ${rests.map(([id, n]) => `<option value="${id}" ${String(id) === filt.restaurant_id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
-    <div><label>${t('status')}</label><select name="status"><option value="">${t('all')}</option>
-      ${STATUSES.map((s) => `<option value="${s}" ${s === filt.status ? 'selected' : ''}>${t('iv_st_' + s)}</option>`).join('')}</select></div></form>` : '';
+  $('#iv-filters').innerHTML = ivs.length ? `<form class="inline-filters no-print" id="iv-f">
+    ${rests.length > 1 ? `<select name="restaurant_id" aria-label="${t('restaurant')}"><option value="">${t('all_restaurants')}</option>
+      ${rests.map(([id, n]) => `<option value="${id}" ${String(id) === filt.restaurant_id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
+    <select name="status" aria-label="${t('status')}"><option value="">${t('all_statuses')}</option>
+      ${STATUSES.map((s) => `<option value="${s}" ${s === filt.status ? 'selected' : ''}>${t('iv_st_' + s)}</option>`).join('')}</select></form>` : '';
   if ($('#iv-f')) $('#iv-f').onchange = (e) => { filt[e.target.name] = e.target.value; drawInterventions(); };
   const rows = ivs.filter((i) => (!filt.restaurant_id || String(i.restaurant_id) === filt.restaurant_id) && (!filt.status || i.status === filt.status));
   const sug = suggestionsHtml();
   if (!rows.length) {
-    $('#iv-body').innerHTML = `${sug}<div class="card empty">${ivs.length ? t('no_data') : t('iv_empty')}</div>`;
+    $('#iv-body').innerHTML = `${sug}<div class="card empty">${ivs.length ? t('no_data') : t(canManage() ? 'iv_empty' : 'iv_empty_staff')}</div>`;
     bindSuggestions();
     return;
   }
@@ -314,6 +312,14 @@ function shareAsBestPractice(iv, e) {
 }
 
 // ------------------------------------------------------------------ best practices
+// Categories as one small dropdown instead of a row of chips (eight chips fill a phone screen)
+function categorySelect(cats, onPick) {
+  if (!cats.length) return '';
+  setTimeout(() => { const el = $('#bp-cat'); if (el) el.onchange = () => { filt.category_id = el.value; onPick(); }; }, 0);
+  return `<form class="inline-filters no-print" onsubmit="return false"><select id="bp-cat" aria-label="${t('category')}">
+    <option value="">${t('all_categories')}</option>
+    ${cats.map((c) => `<option value="${c.id}" ${String(c.id) === filt.category_id ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></form>`;
+}
 async function drawIndustry() {
   const L = lang();
   const pick = (j) => (j ? j[L] || j.en || '' : '');
@@ -324,11 +330,8 @@ async function drawIndustry() {
   }
   const cats = bps.categories || [];
   const used = new Set(industry.map((r) => r.category_id));
-  $('#iv-filters').innerHTML = `<div class="chips no-print" style="margin-bottom:14px">
-    <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
-    ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>
-    <p class="small muted" style="margin:-4px 2px 12px">${t('bp_industry_note')}</p>`;
-  $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawIndustry(); }));
+  $('#iv-filters').innerHTML = `${categorySelect(cats.filter((c) => used.has(c.id)), drawIndustry)}
+    <p class="small muted" style="margin:0 2px 12px">${t('bp_industry_note')}</p>`;
   const rows = industry.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
   $('#iv-body').innerHTML = `<div class="bp-grid">${rows.map((r) => {
     const cat = cats.find((c) => c.id === r.category_id);
@@ -346,12 +349,9 @@ async function drawIndustry() {
 function drawBestPractices() {
   const cats = bps.categories || [];
   const used = new Set(bps.rows.map((r) => r.category_id));
-  $('#iv-filters').innerHTML = (bps.rows.length ? `<div class="chips no-print" style="margin-bottom:14px" id="bp-cats">
-    <button type="button" class="chip ${!filt.category_id ? 'on' : ''}" data-cat="">${t('all')}</button>
-    ${cats.filter((c) => used.has(c.id)).map((c) => `<button type="button" class="chip ${String(c.id) === filt.category_id ? 'on' : ''}" data-cat="${c.id}">${esc(c.label)}</button>`).join('')}</div>` : '');
-  $$('[data-cat]').forEach((b) => (b.onclick = () => { filt.category_id = b.dataset.cat; drawBestPractices(); }));
+  $('#iv-filters').innerHTML = bps.rows.length ? categorySelect(cats.filter((c) => used.has(c.id)), drawBestPractices) : '';
   const rows = bps.rows.filter((r) => !filt.category_id || String(r.category_id) === filt.category_id);
-  if (!rows.length) { $('#iv-body').innerHTML = `<div class="card empty">${t('bp_empty')}</div>`; return; }
+  if (!rows.length) { $('#iv-body').innerHTML = `<div class="card empty">${t(canManage() ? 'bp_empty' : 'bp_empty_staff')}</div>`; return; }
   $('#iv-body').innerHTML = `<div class="bp-grid">${rows.map((r) => `
     <article class="card bp-card">
       <div class="small muted">${r.category ? `<span class="badge green">${esc(r.category)}</span> ` : ''}${r.status !== 'published' ? `<span class="badge warn">${t('bp_draft')}</span> ` : ''}

@@ -322,12 +322,12 @@ test('interventions: own restaurants only, before/after effect with comparison g
   const s = (await db.query(`select coalesce(sum(weight_kg), 0) kg from waste_records where restaurant_id = $1 and reason_id = $2 and deleted_at is null
      and app.local_date(recorded_at) between $3::date - 28 and $3::date - 1`, [ID.ams, ID.spoilage, start])).rows[0];
   assert.ok(Math.abs(e.before.kg - Number(s.kg)) < 0.05);
-  // List with effect summary; students see no interventions
+  // List with effect summary; students read them too (0045), without edit rights
   const l = await as(db, U['orgadmin@hth'], async ({ one }) => (await one(`select interventions_list(null, 'en') l`)).l);
   const mine = l.find((x) => x.id === iv.id);
   assert.ok(mine && mine.effect.status === 'ok' && mine.effect.weekly === null && mine.scope_reason === 'Spoilage');
   const st = await as(db, U['student@hth'], async ({ one }) => (await one(`select interventions_list() l`)).l);
-  assert.deepEqual(st, []);
+  assert.ok(st.length > 0 && st.every((i) => i.can_edit === false));
   // Other organization sees nothing and gets no effect
   const other = await as(db, U['admin@bistro'], async ({ one }) => (await one('select intervention_effect($1) e', [iv.id])).e);
   assert.equal(other, null);
@@ -844,4 +844,20 @@ test('page access: org admin hides pages per role, the student menu follows, man
   } finally {
     await db.query(`update organizations set hidden_pages = '{}' where id = $1`, [ID.hth]);
   }
+});
+
+test('interventions: students read them with the effect, but cannot edit or create', async () => {
+  const mgr = await as(db, U['manager.amsterdam@hth'], async ({ one }) => (await one('select interventions_list() l')).l);
+  const stu = await as(db, U['student@hth'], async ({ one }) => (await one('select interventions_list() l')).l);
+  assert.ok(mgr.length > 0);
+  assert.equal(stu.length, mgr.length);
+  assert.ok(stu.every((i) => i.can_edit === false));
+  assert.ok(stu.every((i) => 'effect' in i));
+  const upd = await as(db, U['student@hth'], ({ q }) => q(`update interventions set title = 'x' where id = $1 returning id`, [stu[0].id]));
+  assert.equal(upd.length, 0);
+  await assert.rejects(as(db, U['student@hth'], ({ q }) => q(`insert into interventions (organization_id, restaurant_id, title, start_date)
+    values ($1, $2, 'x', current_date)`, [ID.hth, ID.ams])));
+  // another organization still sees none of them
+  const other = await as(db, U['admin@bistro'], async ({ one }) => (await one('select interventions_list($1) l', [ID.hth])).l);
+  assert.ok(other.every((i) => !stu.some((s) => s.id === i.id)));
 });
