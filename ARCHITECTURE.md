@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 2 November 2026, after migration 0045. Source of truth is the code in the
+Updated 4 November 2026, after migration 0046. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -18,9 +18,12 @@ Supabase project "waste-log" (eu-central-1)
  ├─ Storage         private buckets: waste photos and invoices, one folder per organization
  └─ Edge Functions  admin-users · identify-food · read-invoice · suggest-ideas · daily · weekly-report · system-check
 
+Postgres pg_cron (0046)
+ └─ waste-log-hourly   minute 7 of every hour: calls the daily function from inside the database
+
 GitHub Actions
  ├─ pages.yml         deploy web/ on every push to main
- ├─ keepalive.yml     every hour: calls the daily function (weather, weekly e-mails, keeps the free project awake)
+ ├─ keepalive.yml     every hour, best effort: backup call to the daily function, keeps the repo's schedules alive
  └─ system-check.yml  every morning before service: morning system check, the job fails when something is red
 ```
 
@@ -78,7 +81,7 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0045). Groups:
+Schema in `supabase/migrations/` (0001 to 0046). Groups:
 
 - **Tenancy:** organizations (incl. `hidden_pages`), restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
@@ -128,7 +131,7 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 
 ## 8. Weather
 
-- **Collected by** the `daily` edge function, every hour via `keepalive.yml`: yesterday and today from Open-Meteo for every restaurant with coordinates, only when the organization has weather switched on (Settings › Organization). Stored in `weather_records`.
+- **Collected by** the `daily` edge function, every hour via pg_cron (backup: `keepalive.yml`): yesterday and today from Open-Meteo for every restaurant with coordinates, only when the organization has weather switched on (Settings › Organization). Stored in `weather_records`.
 - **Shown in:** the Register header (today's weather), a weather column in Records, rain days shaded in the dashboard's daily chart (weather in the tooltip), and the "Weather and waste" card on the dashboard.
 - **Weather and waste card:** avoidable waste only; each day is compared with what is usual for that weekday; buckets warm / mild / cold and rain / dry. It shows "still collecting" until there are at least 20 comparable days, 3 registered days per weekday and 5 days per weather type.
 
@@ -147,7 +150,7 @@ Daily figures come from `dashboard_daily` (one row per calendar day, with `open`
 
 ## 10. Scheduled jobs and monitoring
 
-- **Hourly (`daily`):** weather, weekly impact e-mails on the chosen weekdays or dates, heartbeat for the system check. Idempotent.
+- **Hourly (`daily`):** started by pg_cron in the database (0046), with `keepalive.yml` as a backup because GitHub often runs scheduled workflows hours late. Weather, weekly impact e-mails on the chosen weekdays or dates, heartbeat for the system check. Idempotent.
 - **Morning system check (`system-check`):** tests every connection, lists important setting changes of the last 24 hours and gaps in the data, stores the result (Settings › System check). Red makes the GitHub job fail, which sends an e-mail.
 
 ## 11. Roadmap
