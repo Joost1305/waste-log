@@ -30,8 +30,10 @@ const ICONS = {
   more: svg('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
 };
 // Phone bottom bar: the first four visible pages in this order get a tab, the rest go under More.
-// Staff: Register, Records, Improve, Gallery. Managers: Register, Dashboard, Records, Improve.
+// Gallery always has its own tab (when the page is not hidden), after those four.
+// Staff: Register, Records, Improve, Gallery. Managers: Register, Dashboard, Records, Improve, Gallery.
 const TAB_ORDER = ['register', 'dashboard', 'records', 'interventions', 'gallery', 'leaderboard', 'settings', 'profile'];
+const PINNED_TABS = ['gallery'];
 
 // Pages an organization admin can hide per role (Settings > Page access). Register, Settings and Profile always stay.
 const hidden = (path) => !!(state.meta && Array.isArray(state.meta.hidden_pages) && state.meta.hidden_pages.includes(path));
@@ -106,8 +108,11 @@ function renderTabbar(visible, current, p) {
   const bar = $('#tabbar');
   const byPath = Object.fromEntries(visible.map((r) => [r.path, r]));
   const ordered = TAB_ORDER.filter((x) => byPath[x]).map((x) => byPath[x]);
-  const tabs = ordered.slice(0, 4);
-  const rest = ordered.slice(4);
+  const pinned = ordered.filter((r) => PINNED_TABS.includes(r.path));
+  const others = ordered.filter((r) => !PINNED_TABS.includes(r.path));
+  const tabs = [...others.slice(0, 4), ...pinned];
+  const rest = others.slice(4);
+  bar.classList.toggle('six', tabs.length >= 5);
   const inMore = rest.some((r) => r.path === current);
   const tab = (href, icon, label, on) => `<a href="${href}" class="tab ${on ? 'active' : ''}" ${on ? 'aria-current="page"' : ''}>${ICONS[icon]}<span>${label}</span></a>`;
   bar.innerHTML = tabs.map((r) => tab(`#/${r.path}`, r.path, t(r.nav), current === r.path)).join('') +
