@@ -288,6 +288,10 @@ route('POST', '/waste/photo/identify', async ({ body }) => invoke('identify-food
 route('GET', '/top-products', async ({ query }) =>
   check(await sb.rpc('top_products', { p_restaurant: num(query.restaurant_id), p_days: num(query.days) || 30, p_limit: num(query.limit) || 12 })));
 
+// smart suggestions for the register screen: likely products for this moment of the day and weekday (0047)
+route('GET', '/suggest-products', async ({ query }) =>
+  check(await sb.rpc('suggest_products', { p_restaurant: num(query.restaurant_id), p_at: query.at || new Date().toISOString(), p_limit: num(query.limit) || 3 })));
+
 // gallery: photos, heaviest first
 route('GET', '/gallery', async ({ query }) => {
   const res = check(await sb.rpc('gallery_photos', {

@@ -81,7 +81,7 @@ permissions. A user can never grant a role above their own.
 
 ## 5. Data model
 
-Schema in `supabase/migrations/` (0001 to 0046). Groups:
+Schema in `supabase/migrations/` (0001 to 0047). Groups:
 
 - **Tenancy:** organizations (incl. `hidden_pages`), restaurants (incl. `open_days`, coordinates), roles, users, user_restaurants, sections, audit_log
 - **Taxonomy:** waste_categories (+ CO₂ factor), categories, waste_reasons (avoidable or not; inedible trim counts in kg and CO₂ but not in euros)
@@ -99,8 +99,8 @@ Schema in `supabase/migrations/` (0001 to 0046). Groups:
 
 | Route | Who | What |
 |---|---|---|
-| `#/register` | everyone | Register waste; quick buttons from most-registered products; today's weather and team streak in the header; kitchen mode |
-| `#/records` | everyone (own) / managers (all) | List with filters, weather per day, correct or delete |
+| `#/register` | everyone | Register waste; three "likely now" suggestions (`suggest_products`, 0047: same moment of the day and weekday count more, recent weeks count more), the rest of the quick buttons and the categories behind "Show more products"; today's weather and team streak in the header; kitchen mode |
+| `#/records` | everyone (own) / managers (all) | List with filters, weather per day, correct or delete; under each value the calculation (kg × price/kg) and where the price came from, the default price in amber |
 | `#/gallery` | everyone | Waste photos, heaviest first; filter estimated vs weighed; inedible trim hidden by default; slideshow; impact poster (managers and up) |
 | `#/dashboard` | managers and up | Summary line, KPIs, daily chart, by category / reason / product / section, weather and waste, print, Excel export |
 | `#/interventions` | everyone | Page "Improve": tabs Interventions / Best practices / Industry. Everyone reads the organization's interventions with their before/after effect (0045); suggestions, new and edit for managers and up |
