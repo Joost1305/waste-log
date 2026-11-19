@@ -179,6 +179,26 @@ async function route() {
 new MutationObserver(() => compactActions(app())).observe(app(), { childList: true, subtree: true });
 
 window.addEventListener('hashchange', route);
+
+// Phones and home-screen apps keep the old page for a while after a deploy. Check the live version
+// (version.txt, never cached) on start and whenever the app comes back to the foreground; when it
+// differs, reload once with the version in the address so the browser cannot serve the old page.
+async function checkVersion() {
+  const mine = window.__appVersion;
+  if (!mine || mine === 'dev') return;
+  try {
+    const res = await fetch(`version.txt?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const live = (await res.text()).trim();
+    if (!live || live === mine) return;
+    const key = `fw_reloaded_${live}`;
+    if (sessionStorage.getItem(key)) return; // tried once already for this version: never loop
+    sessionStorage.setItem(key, '1');
+    location.replace(`${location.pathname}?v=${encodeURIComponent(live)}${location.hash}`);
+  } catch { /* offline: try again next time */ }
+}
+checkVersion();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
 window.addEventListener('fw:lang', async () => { resetCo2Cache(); if (state.user) await loadMeta(); route(); });
 // Opening the app (or reopening a saved tab or home-screen icon) always lands on registration,
 // whatever page was open last time. Invitation and password links are left alone.

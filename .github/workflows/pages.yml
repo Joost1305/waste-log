@@ -32,6 +32,9 @@ jobs:
           v=${GITHUB_SHA::8}
           find web/js -name '*.js' -exec sed -i -E "s#(from '\.{1,2}/[^']+\.js)'#\1?v=$v'#g; s#(import\('\.{1,2}/[^']+\.js)'\)#\1?v=$v')#g" {} +
           sed -i -E "s#(src=\"(js/app\.js|vendor/[^\"]+\.js))\"#\1?v=$v\"#g; s#(href=\"css/app\.css)\"#\1?v=$v\"#" web/index.html
+          # The app compares this with the live version.txt and reloads itself when a newer one is out
+          sed -i "s#window.__appVersion = 'dev'#window.__appVersion = '$v'#" web/index.html
+          echo "$v" > web/version.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
