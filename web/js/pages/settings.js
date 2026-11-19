@@ -23,6 +23,7 @@ function sections() {
   return [
     p.catalog && {
       key: 'products', title: t('set_products'), endpoint: '/products', canEdit: true, reloadMeta: true,
+      search: (r) => [r.name, r.name_en, r.supplier_name, labelOf(meta.waste_categories, r.waste_category_id)],
       headerActions: [{ label: `&#128269; ${t('mp_btn')}`, run: (reload) => openMissingProducts(reload) },
         { label: `&#11014; ${t('imp_btn')}`, run: (reload) => openProductImport(reload) }],
       columns: [
@@ -51,12 +52,14 @@ function sections() {
     },
     p.catalog && {
       key: 'suppliers', title: t('set_suppliers'), endpoint: '/suppliers', canEdit: true, reloadMeta: true,
+      search: (r) => [r.name, r.contact],
       columns: [[t('name'), (r) => esc(r.name)], [t('contact'), (r) => esc(r.contact || '')]],
       fields: () => [{ name: 'name', label: t('name'), required: true }, { name: 'contact', label: t('contact') }],
     },
     p.catalog && { key: 'invoices', title: t('inv_title'), custom: renderInvoices },
     p.catalog && {
       key: 'menu', title: t('set_menu'), endpoint: '/menu-items', canEdit: true, reloadMeta: true,
+      search: (r) => [r.name, r.restaurant_name],
       headerActions: salesOn() ? [{ label: `&#128279; ${t('tl_btn')}`, run: (reload) => openTillLinks(reload) }] : [],
       columns: [
         [t('name'), (r) => esc(r.name)], [t('restaurant'), (r) => esc(r.restaurant_name || t('all_restaurants'))],
@@ -181,17 +184,32 @@ async function crud(el, cfg) {
   const canDelete = cfg.canDelete !== false;
   el.innerHTML = `<div class="card"><div class="page-head" style="margin-bottom:12px"><h2 style="margin:0">${cfg.title}</h2>
     <div class="page-actions">${(cfg.headerActions || []).map((a, i) => `<button class="btn-sm" data-hact="${i}">${a.label}</button>`).join('')}
-    ${canCreate ? `<button class="btn-primary btn-sm" id="crud-add">+ ${t('add')}</button>` : ''}</div></div><div id="crud-list"><span class="spinner"></span></div></div>`;
+    ${canCreate ? `<button class="btn-primary btn-sm" id="crud-add">+ ${t('add')}</button>` : ''}</div></div>
+    ${cfg.search ? `<div class="field crud-search"><input type="search" id="crud-q" placeholder="${t('search')}" autocomplete="off"></div>` : ''}
+    <div id="crud-list"><span class="spinner"></span></div></div>`;
   let rows = [];
+  // Search as you type: ignores capitals and accents, all words must match (in any order)
+  const fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let q = '';
+  const visible = () => {
+    const terms = fold(q).split(/\s+/).filter(Boolean);
+    if (!cfg.search || !terms.length) return rows;
+    return rows.filter((r) => { const hay = fold(cfg.search(r).filter(Boolean).join(' ')); return terms.every((x) => hay.includes(x)); });
+  };
   const load = async () => {
     try { rows = (await api(cfg.endpoint)).data; } catch (e) { toastError(e); return; }
-    $('#crud-list').innerHTML = rows.length ? `<div class="table-wrap"><table class="stack"><thead><tr>
+    draw();
+  };
+  const draw = () => {
+    const shown = visible();
+    $('#crud-list').innerHTML = (cfg.search && q.trim() ? `<div class="small muted" style="margin-bottom:6px">${shown.length} / ${rows.length}</div>` : '') +
+      (shown.length ? `<div class="table-wrap"><table class="stack"><thead><tr>
       ${cfg.columns.map((c) => `<th class="${c[2] ? 'right' : ''}">${c[0]}</th>`).join('')}<th></th></tr></thead><tbody>
-      ${rows.map((r) => `<tr>${cfg.columns.map((c) => `<td class="${c[2] ? 'right num' : ''}" data-label="${esc(String(c[0]).replace(/<[^>]*>/g, ''))}">${c[1](r) ?? ''}</td>`).join('')}
+      ${shown.map((r) => `<tr>${cfg.columns.map((c) => `<td class="${c[2] ? 'right num' : ''}" data-label="${esc(String(c[0]).replace(/<[^>]*>/g, ''))}">${c[1](r) ?? ''}</td>`).join('')}
         <td class="actions">${(cfg.rowActions || []).map((a, i) => (a.show(r) ? `<button class="btn-sm btn-ghost" data-act="${i}" data-id="${r.id}">${a.label}</button>` : '')).join('')}
         ${cfg.canEdit ? `<button class="btn-sm" data-edit="${r.id}">${t('edit')}</button>` : ''}
         ${canDelete && r.id !== state.user.id ? `<button class="btn-sm btn-ghost btn-danger" data-del="${r.id}">${t('delete')}</button>` : ''}</td></tr>`).join('')}
-      </tbody></table></div>` : `<div class="empty">${t('no_data')}</div>`;
+      </tbody></table></div>` : `<div class="empty">${t('no_data')}</div>`);
     const byId = (id) => rows.find((r) => String(r.id) === String(id));
     $$('[data-edit]', el).forEach((b) => (b.onclick = () => openForm(byId(b.dataset.edit))));
     $$('[data-act]', el).forEach((b) => (b.onclick = () => cfg.rowActions[Number(b.dataset.act)].run(byId(b.dataset.id))));
@@ -225,6 +243,8 @@ async function crud(el, cfg) {
   $$('[data-hact]', el).forEach((b) => (b.onclick = () => cfg.headerActions[Number(b.dataset.hact)].run(() => load())));
   const add = $('#crud-add');
   if (add) add.onclick = () => openForm(null);
+  const qi = $('#crud-q');
+  if (qi) qi.oninput = () => { q = qi.value; draw(); };
   load();
 }
 

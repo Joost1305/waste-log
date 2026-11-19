@@ -105,7 +105,7 @@ Schema in `supabase/migrations/` (0001 to 0047). Groups:
 | `#/dashboard` | managers and up | Summary line, KPIs, daily chart, by category / reason / product / section, weather and waste, print, Excel export |
 | `#/interventions` | everyone | Page "Improve": tabs Interventions / Best practices / Industry. Everyone reads the organization's interventions with their before/after effect (0045); suggestions, new and edit for managers and up |
 | `#/leaderboard` | when switched on | Sections within a restaurant, prevention ideas |
-| `#/settings/...` | per permission | Products, suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, page access, audit, organizations, system check |
+| `#/settings/...` | per permission | Products (with search), suppliers, invoices, menu, guests per day, targets, restaurants, users, sales, weekly e-mail, leaderboard, export, organization, page access, audit, organizations, system check |
 | `#/profile` | everyone | Name, language, password |
 | `#/impact` | public, by link | Aggregated waste trend of a restaurant or organization |
 
