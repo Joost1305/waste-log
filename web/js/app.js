@@ -32,7 +32,8 @@ const ICONS = {
 // Phone bottom bar: the first four visible pages in this order get a tab, the rest go under More.
 // Gallery always has its own tab (when the page is not hidden), after those four.
 // Staff: Register, Records, Improve, Gallery. Managers: Register, Dashboard, Records, Improve, Gallery.
-const TAB_ORDER = ['register', 'dashboard', 'records', 'interventions', 'gallery', 'leaderboard', 'settings', 'profile'];
+// Records has no tab of its own: it sits under More and in Settings
+const TAB_ORDER = ['register', 'dashboard', 'interventions', 'gallery', 'leaderboard', 'settings', 'profile', 'records'];
 const PINNED_TABS = ['gallery'];
 
 // Pages an organization admin can hide per role (Settings > Page access). Register, Settings and Profile always stay.

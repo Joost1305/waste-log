@@ -157,6 +157,8 @@ function sections() {
     p.audit && state.user.role !== 'super_admin' && { key: 'audit', title: t('set_audit'), custom: renderAudit },
     p.organizations && { key: 'organizations', title: t('set_orgs'), custom: renderOrganizations },
     state.user.role === 'super_admin' && { key: 'system', title: t('sc_title'), custom: renderSystemCheck },
+    // Records lives outside Settings but is reachable from here, so it does not need a tab in the bottom bar
+    !(Array.isArray(meta.hidden_pages) && meta.hidden_pages.includes('records')) && { key: 'records-link', title: `${t('nav_records')} &#8250;`, href: '#/records' },
   ].filter(Boolean);
 }
 
@@ -167,14 +169,16 @@ const HELP_ANCHOR = { products: '#products', invoices: '#products', suppliers: '
 export async function renderSettings(rest) {
   const list = sections();
   const chosen = list.find((s) => s.key === rest[0]);
-  const current = chosen || list[0];
+  const current = (chosen && !chosen.href ? chosen : null) || list.find((s) => !s.href) || list[0];
+  if (chosen && chosen.href) { location.hash = chosen.href; return; }
   // Phone: without a chosen section only the list shows; with one, only that section plus a back link
   app().innerHTML = `
     <div class="page-head"><h1>${t('set_title')} <a class="help-q help-q-sm" href="help/admins.html${HELP_ANCHOR[current.key] || ''}" title="${t('help_admin')}" aria-label="${t('help_admin')}">?</a></h1></div>
     <div class="settings ${chosen ? 'has-section' : 'menu-only'}">
-      <nav class="settings-nav">${list.map((s) => `<a href="#/settings/${s.key}" class="${s === current ? 'active' : ''}">${s.title}</a>`).join('')}</nav>
+      <nav class="settings-nav">${list.map((s) => `<a href="${s.href || `#/settings/${s.key}`}" class="${s === current && !s.href ? 'active' : ''}">${s.title}</a>`).join('')}</nav>
       <div class="settings-main"><a href="#/settings" class="settings-back">&#8249; ${t('set_title')}</a><div id="set-body"></div></div>
     </div>`;
+  if (current.href) return;
   if (current.custom) return current.custom($('#set-body'));
   return crud($('#set-body'), current);
 }
