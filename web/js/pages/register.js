@@ -251,6 +251,7 @@ async function handlePhoto(file) {
 // Automatic quick buttons per restaurant, fetched once per restaurant and refreshed after saving
 const topCache = new Map();
 async function loadTop(force = false) {
+  loadSuggest(force);
   const rid = s.restaurantId;
   if (!rid || (!force && topCache.has(rid))) return;
   try {
@@ -258,6 +259,21 @@ async function loadTop(force = false) {
     topCache.set(rid, rows.map((r) => Number(r.product_id)));
     if (rid === s.restaurantId && !s.search) renderWhat();
   } catch { topCache.set(rid, []); }
+}
+
+// Smart suggestions (0047): the three most likely products for this restaurant, moment of the day and weekday.
+// Refreshed after saving and after 20 minutes, so lunch suggestions do not stay up during dinner.
+const SUGGEST_COUNT = 3;
+const suggestCache = new Map(); // restaurant id -> { at, ids }
+async function loadSuggest(force = false) {
+  const rid = s.restaurantId;
+  const hit = suggestCache.get(rid);
+  if (!rid || (!force && hit && Date.now() - hit.at < 20 * 60 * 1000)) return;
+  try {
+    const rows = (await api('/suggest-products', { query: { restaurant_id: rid, limit: SUGGEST_COUNT } })).data || [];
+    suggestCache.set(rid, { at: Date.now(), ids: rows.map((r) => Number(r.product_id)) });
+  } catch { suggestCache.set(rid, { at: Date.now(), ids: [] }); }
+  if (rid === s.restaurantId && !s.search) renderWhat();
 }
 
 function recentIds() { try { return JSON.parse(localStorage.getItem(LS.recent) || '[]'); } catch { return []; } }
@@ -303,23 +319,29 @@ function renderWhat() {
   const el = $('#sec-what');
   const done = Boolean(s.productId || s.categoryId);
   const q = s.search.trim().toLowerCase();
-  let tiles; let autoCount = 0;
+  let tiles; let suggested = [];
   if (q) tiles = searchProducts(meta.products, q, recentIds()).slice(0, 12);
   else {
-    // Most registered in this restaurant first, then pinned quick buttons, then this device's recent products
+    // Pool: most registered in this restaurant, then pinned quick buttons, then this device's recent products
     const byId = (id) => meta.products.find((p) => p.id === id);
     const top = (topCache.get(s.restaurantId) || []).map(byId).filter(Boolean);
     const quick = meta.products.filter((p) => p.is_quick_pick);
     const rec = recentIds().map(byId).filter(Boolean);
-    tiles = [...new Set([...top, ...quick, ...rec])].slice(0, 12);
-    autoCount = top.length;
+    const smart = ((suggestCache.get(s.restaurantId) || {}).ids || []).map(byId).filter(Boolean);
+    // Three suggestions up front (smart first, topped up from the pool); the rest only on request
+    const pool = [...new Set([...smart, ...top, ...quick, ...rec])];
+    suggested = pool.slice(0, SUGGEST_COUNT);
+    tiles = pool.slice(SUGGEST_COUNT, 12 + SUGGEST_COUNT);
   }
   const catLabel = (id) => (meta.waste_categories.find((c) => c.id === id) || {}).label || '';
   const selected = s.productId ? meta.products.find((p) => p.id === s.productId) : null;
   // Products the AI matched to the photo: shown as their own row of tiles, best match first and pre-selected
   const sg = s.photo && s.photo.ai === 'done' && s.photo.suggestion;
   const photoTiles = !q && sg ? (sg.candidates || []).map((c) => meta.products.find((p) => p.id === c.id)).filter(Boolean) : [];
-  if (photoTiles.length) tiles = tiles.filter((p) => !photoTiles.includes(p)).slice(0, 8);
+  // With a photo the photo matches replace the suggestions (they are better); the rest moves under "show all"
+  if (photoTiles.length) { tiles = [...suggested, ...tiles].filter((p) => !photoTiles.includes(p)).slice(0, 12); suggested = []; }
+  const showAll = !!s.showAll;
+  const showCats = !s.productId && (showAll || !!s.productName || !!q);
   const tileHtml = (p) => `<button type="button" class="tile ${p.id === s.productId ? 'on' : ''}" data-p="${p.id}">
       ${esc(p.name)}<span class="sub">${esc(catLabel(p.waste_category_id))}</span></button>`;
   // The chosen product's name appears in the search line; typing there starts a new search
@@ -333,11 +355,14 @@ function renderWhat() {
     ${photoTiles.length ? `<div class="small muted" style="margin:-4px 0 8px">&#128247; ${t('reg_photo_matches')}</div>
       <div class="tiles photo-tiles">${photoTiles.map(tileHtml).join('')}</div>
       <div style="height:14px"></div>` : ''}
-    ${!q && autoCount ? `<div class="small muted" style="margin:-4px 0 8px">${t('reg_top_hint')}</div>` : ''}
-    <div class="tiles">${tiles.map(tileHtml).join('')}
-      ${q && !tiles.some((p) => fold(p.name) === fold(q)) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
-    </div>
-    ${!s.productId ? `<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">${t('reg_or_category')}</div>
+    ${suggested.length ? `<div class="small muted" style="margin:-4px 0 8px">${t('reg_suggest_hint')}</div>
+      <div class="tiles suggest-tiles">${suggested.map(tileHtml).join('')}</div>` : ''}
+    ${q ? `<div class="tiles">${tiles.map(tileHtml).join('')}
+      ${!tiles.some((p) => fold(p.name) === fold(q)) ? `<button type="button" class="tile" id="free-text">“${esc(s.search.trim())}”<span class="sub">${t('reg_free_text')}</span></button>` : ''}
+    </div>` : ''}
+    ${!q && (tiles.length || !s.productId) ? `<div style="margin-top:10px"><button type="button" class="link-btn" id="show-all" aria-expanded="${showAll}">${showAll ? t('reg_show_less') : t('reg_show_all')}</button></div>` : ''}
+    ${!q && showAll && tiles.length ? `<div class="small muted" style="margin:8px 0">${t('reg_top_hint')}</div><div class="tiles">${tiles.map(tileHtml).join('')}</div>` : ''}
+    ${showCats ? `<div style="margin-top:12px"><div class="small muted" style="margin-bottom:6px">${t('reg_or_category')}</div>
       <div class="chips">${meta.waste_categories.map((c) =>
         `<button type="button" class="chip ${c.id === s.categoryId ? 'on' : ''}" data-c="${c.id}">${esc(c.label)}</button>`).join('')}</div></div>` : ''}
     ${done ? `<div class="selected-line">${t('reg_selected')}: <strong>${esc(selected ? selected.name : (s.productName || ''))}</strong>
@@ -367,6 +392,8 @@ function renderWhat() {
     s.categoryId = s.categoryId === id ? null : id;
     renderWhat(); updateSave(); renderPhoto();
   }));
+  const all = $('#show-all');
+  if (all) all.onclick = () => { s.showAll = !s.showAll; renderWhat(); };
   const free = $('#free-text');
   if (free) free.onclick = () => { s.productId = null; s.productName = s.search.trim(); s.search = ''; renderWhat(); updateSave(); };
 }
