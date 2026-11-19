@@ -1,6 +1,6 @@
 # Architecture
 
-Updated 4 November 2026, after migration 0046. Source of truth is the code in the
+Updated 19 November 2026, after migration 0047. Source of truth is the code in the
 `Joost1305/waste-log` repo; this document describes what is actually built.
 
 ## 1. Product architecture
@@ -22,7 +22,7 @@ Postgres pg_cron (0046)
  └─ waste-log-hourly   minute 7 of every hour: calls the daily function from inside the database
 
 GitHub Actions
- ├─ pages.yml         deploy web/ on every push to main
+ ├─ pages.yml         deploy web/ on every push to main; writes version.txt, the app reloads itself when a newer version is out
  ├─ keepalive.yml     every hour, best effort: backup call to the daily function, keeps the repo's schedules alive
  └─ system-check.yml  every morning before service: morning system check, the job fails when something is red
 ```
